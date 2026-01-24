@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" type="text/css" href="index.css">
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <div class="toolbar">
+        <a href="index.html"><i class="fas fa-home"></i> Home</a>
+        <a href="config.html"><i class="fas fa-cog"></i> Configuration</a>
+        <a href="about.html"><i class="fas fa-info-circle"></i> About</a>
+        <a href="contact.html"><i class="fas fa-envelope"></i> Contact</a>
+    </div>
+
+    <!-- Missing Modules Warning Banner -->
+    <div id="missing-modules-warning" class="missing-modules-warning hidden">
+        <div class="warning-content">
+            <div class="warning-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="warning-text">
+                <strong>Warning: Configuration Issues</strong>
+                <div id="warning-details" class="warning-details"></div>
+            </div>
+            <button id="close-warning" class="close-warning-btn" aria-label="Close warning">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div id="container">
+        <!-- Logo -->
+        <a href="index.html"><img id="site-logo" class="logo"></a>
+        <div style="padding: 24px;"></div>
+        <!-- Tagline -->
+        <h2 id="site-tagline"></h2>
+
+        <!-- Disclaimer -->
+        <p class="disclaimer"></p>
+
+        <!-- Question Input -->
+        <div class="input-container">
+            <label for="question" class="visually-hidden">Enter your question</label>
+            <input type="text" id="question">
+            <button id="submit">Submit</button>
+        </div>
+        <!-- Recent Questions -->
+        <div id="recent-questions" class="hidden"></div>
+        <!-- Similar Suggestions (dynamic) -->
+        <div id="similar-suggestions" class="hidden"></div>
+
+        <!-- Answer Output -->
+        <div id="results" class="hidden">
+            <!-- Resize Handle -->
+            <div id="resize-handle" class="resize-handle">
+                <div class="resize-handle-bar"></div>
+                <div class="resize-handle-text">Drag to resize</div>
+            </div>
+            <div class="results-content">
+                <div id="output">
+                    <textarea readonly placeholder="Answer will load here..."></textarea>
+                </div>
+                <div id="references">
+                    <textarea id="references" readonly placeholder="References will appear here..."></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- PDF Download Button -->
+        <div class="button-container">
+            <button id="generate-pdf-button" class="hidden">
+                <i class="fas fa-download"></i> Download Answer as PDF
+            </button>
+        </div>
+
+        <!-- Similar Questions Section -->
+        <div class="similar-questions" id="similarQuestions"></div>
+    </div>
+    <!-- Load Config & Dynamic Script -->
+    <script src="env.js"></script>
+    <script src="user_env.js"></script>
+    <script src="user_based.js"></script>
+    <script src="user_flow.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+    <!-- Main App Logic -->
+    <script src="index.js"></script>
+   
+</body>
+</html>

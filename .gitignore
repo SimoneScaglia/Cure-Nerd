@@ -12,3 +12,14 @@ customnerd-backend/dietnerd.txt
 logs/
 customnerd-backend/nerd_engine_venv/
 customnerd-backend/nerd_engine_venv.zip
+
+# Environment files (contain API keys - DO NOT COMMIT)
+# Exclude all .env files except variables.env (which is empty/template)
+*.env
+customnerd-backend/*.env
+!customnerd-backend/variables.env
+customnerd-backend/ATT*.env
+
+# User data and backups
+customnerd-backend/historical_answer.json
+customnerd-backend/saved_states/*/historical_answer.json

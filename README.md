@@ -24,6 +24,7 @@ Custom-Nerd/Nerd-Engine is a modular, configuration-driven research assistant en
     2) `python setup.py` (runs inside WSL2)
     3) `python run.py` (runs inside WSL2)
   - Then: Open the Configuration page → add API keys → save.
+  - **For detailed instructions, see [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md)**
 - Keys: OPENAI_API_KEY (or GEMINI_API_KEY),. Optional per domain: GNEWS_API_KEY, NEWS_API_KEY, GUARDIAN_API_KEY, ELSEVIER_API_KEY, SPRINGER_API_KEY, WILEY_API_KEY, OXFORD_API_KEY, OXFORD_APP_HEADER, ADS_API_TOKEN.
 - Configure: Frontend, Backend Prompts, Environment, User Flow, Save/Load State.
 
@@ -190,6 +191,8 @@ The tool is designed to provide reliable and up-to-date information for individu
 ## Quick Installation
 
 > **💡 Tip:** If you encounter errors during installation, try using ChatGPT or Gemini - they are really helpful for debugging installation issues!
+> 
+> **📖 For detailed installation instructions, see [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md)**
 
 ### Prerequisites
 - Python 3.11 or 3.12 ([Download Python 3.11.9](https://www.python.org/downloads/release/python-3119/))
