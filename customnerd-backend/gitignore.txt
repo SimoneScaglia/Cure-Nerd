@@ -1,0 +1,14 @@
+node_modules/
+__pycache__/
+dump_test/
+ATT81274.env
+variables.env
+!main.py
+!openai_prompts.py
+!requirements.txt
+!helper_functions.py
+customnerd-backend/myenv/
+.DS_Store
+customnerd-backend/customnerdnew.txt
+customnerd-backend/dietnerd.txt
+customnerd-backend/prompts_comparison.csv

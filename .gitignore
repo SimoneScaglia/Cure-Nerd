@@ -14,10 +14,11 @@ customnerd-backend/nerd_engine_venv/
 customnerd-backend/nerd_engine_venv.zip
 
 # Environment files (contain API keys - DO NOT COMMIT)
-# Exclude all .env files except variables.env (which is empty/template)
+# Exclude all .env files except variables.env files (which are empty/templates)
 *.env
 customnerd-backend/*.env
 !customnerd-backend/variables.env
+!customnerd-backend/saved_states/*/variables.env
 customnerd-backend/ATT*.env
 
 # User data and backups
