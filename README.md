@@ -24,7 +24,7 @@ Custom-Nerd/Nerd-Engine is a modular, configuration-driven research assistant en
     2) `python setup.py` (runs inside WSL2)
     3) `python run.py` (runs inside WSL2)
   - Then: Open the Configuration page → add API keys → save.
-- Keys: OPENAI_API_KEY (or GEMINI_API_KEY),. Optional per domain: GNEWS_API_KEY, NEWS_API_KEY, GUARDIAN_API_KEY, ELSEVIER_API_KEY, SPRINGER_API_KEY, WILEY_API_KEY, OXFORD_API_KEY, OXFORD_APP_HEADER, ADS_API_TOKEN.
+- Keys: OPENAI_API_KEY (or GEMINI_API_KEY, or ANTHROPIC_API_KEY). Optional per domain: GNEWS_API_KEY, NEWS_API_KEY, GUARDIAN_API_KEY, ELSEVIER_API_KEY, SPRINGER_API_KEY, WILEY_API_KEY, OXFORD_API_KEY, OXFORD_APP_HEADER, ADS_API_TOKEN.
 - Configure: Frontend, Backend Prompts, Environment, User Flow, Save/Load State.
 
 ## Table of Contents
@@ -68,7 +68,7 @@ Custom-Nerd/Nerd-Engine is a modular, configuration-driven research assistant en
 - State save/restore (DietNerd/NewsNerd/SpaceNerd/CloudNerd patterns)
 
 ### Essential Keys
-- Required: OPENAI_API_KEY (or GEMINI_API_KEY)
+- Required: OPENAI_API_KEY (or GEMINI_API_KEY, or ANTHROPIC_API_KEY)
 - Optional by domain: ELSEVIER_API_KEY, SPRINGER_API_KEY, WILEY_API_KEY, OXFORD_API_KEY, OXFORD_APP_HEADER, GNEWS_API_KEY, NEWS_API_KEY, GUARDIAN_API_KEY, ADS_API_TOKEN
 
 ### Docs
@@ -157,7 +157,7 @@ The tool is designed to provide reliable and up-to-date information for individu
 - Frontend: HTML, CSS, JavaScript
 - Backend: FastAPI, Python
 - Databases: MySQL
-- LLM Integration: OpenAI GPT & Google Gemini (configurable)
+- LLM Integration: OpenAI GPT, Google Gemini & Anthropic Claude (configurable)
 
 ## Project Structure
 
@@ -189,7 +189,7 @@ The tool is designed to provide reliable and up-to-date information for individu
 
 ## Quick Installation
 
-> **💡 Tip:** If you encounter errors during installation, try using ChatGPT or Gemini - they are really helpful for debugging installation issues!
+> **💡 Tip:** If you encounter errors during installation, try using ChatGPT, Claude, or Gemini - they are really helpful for debugging installation issues!
 
 ### Prerequisites
 - Python 3.11 or 3.12 ([Download Python 3.11.9](https://www.python.org/downloads/release/python-3119/))
@@ -271,11 +271,11 @@ The tool is designed to provide reliable and up-to-date information for individu
   - `logs/presetup/` - Windows WSL setup logs
   - `logs/setup/` - Installation logs
   - `logs/run/` - Server run logs
-- **Troubleshooting:** If you encounter errors, check the logs and try using ChatGPT or Gemini for help.
+- **Troubleshooting:** If you encounter errors, check the logs and try using ChatGPT, Claude, or Gemini for help.
 
 ### Configure API Keys
 
-After installation, open `customnerd-backend/variables.env` and add your `OPENAI_API_KEY` (required).
+After installation, open `customnerd-backend/variables.env` and add your `OPENAI_API_KEY`, `GEMINI_API_KEY`, or `ANTHROPIC_API_KEY` (at least one required).
 
 ## Step 8: Update Environment Keys (REQUIRED)
 
@@ -307,7 +307,7 @@ The system cannot function without valid API keys - this step is mandatory befor
 
 ## Troubleshooting Tip
 
-There will be moments when you might get stuck due to errors. If that happens, copy the exact terminal error message and paste it into **ChatGPT or Gemini**. These AI tools can help you quickly troubleshoot and resolve issues.
+There will be moments when you might get stuck due to errors. If that happens, copy the exact terminal error message and paste it into **ChatGPT, Claude, or Gemini**. These AI tools can help you quickly troubleshoot and resolve issues.
 
 
 ## Configuring Custom-Nerd/Nerd-Engine
@@ -351,6 +351,7 @@ This tab allows you to update all your API keys and environment variables:
 - **NCBI_API_KEY**: Update your NCBI API key here. [Get API Key](https://support.nlm.nih.gov/kbArticle/?pn=KA-05317)
 - **OPENAI_API_KEY**: Update your OpenAI API key here. [Get API Key](https://openai.com/index/openai-api/)
 - **GEMINI_API_KEY**: Update your Google Gemini API key here. [Get API Key](https://ai.google.dev/)
+- **ANTHROPIC_API_KEY**: Update your Anthropic Claude API key here. [Get API Key](https://console.anthropic.com/)
 - **ELSEVIER_API_KEY**: Update your Elsevier API key here. [Get API Key](https://dev.elsevier.com/apikey/manage)
 - **SPRINGER_API_KEY**: Update your Springer API key here. [Get API Key](https://dev.springernature.com/docs/quick-start/api-access/)
 - **WILEY_API_KEY**: Update your Wiley API key here. [Get API Key](https://onlinelibrary.wiley.com/library-info/resources/text-and-datamining)
@@ -523,7 +524,7 @@ Before you begin, ensure you have the following installed:
 - Virtual environment tool (venv or conda)
 
 Required API Keys:
-- OpenAI API Key (or Google Gemini API Key)
+- OpenAI API Key (or Google Gemini API Key, or Anthropic Claude API Key)
 - NCBI API Key
 - Elsevier API Key
 - Springer API Key
@@ -636,7 +637,7 @@ A: The system uses real-time API connections to academic databases, ensuring the
 ### Technical Questions
 
 **Q: Can I use a different LLM instead of GPT?**
-A: Yes, the system is designed to be modular. You can configure different LLMs in the backend configuration.
+A: Yes, the system is designed to be modular. You can configure different LLMs—OpenAI (GPT), Google (Gemini), or Anthropic (Claude)—in the backend configuration.
 
 **Q: How do I add support for new academic databases?**
 A: You can add new database support through the User Flow Configuration panel.
