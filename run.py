@@ -10,6 +10,7 @@ import socket
 import datetime
 import re
 import shutil
+import time
 from pathlib import Path
 
 # Import WSL functions from setup.py
@@ -223,6 +224,61 @@ def is_port_free(port):
         return s.connect_ex(("localhost", port)) != 0
 
 
+def kill_process_on_port(port, logger):
+    """
+    Find and kill the process listening on the given port.
+    Returns True if a process was killed and port is now free, False otherwise.
+    """
+    system = platform.system()
+    pids = []
+    try:
+        if system in ("Darwin", "Linux"):
+            # lsof -i :8000 -t returns PIDs only
+            result = subprocess.run(
+                ["lsof", "-i", f":{port}", "-t"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                pids = [p.strip() for p in result.stdout.strip().split("\n") if p.strip()]
+        elif system == "Windows":
+            # netstat -ano | findstr :8000
+            result = subprocess.run(
+                ["netstat", "-ano"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            for line in (result.stdout or "").splitlines():
+                if f":{port}" in line and "LISTENING" in line:
+                    parts = line.split()
+                    if parts:
+                        pid = parts[-1]
+                        if pid.isdigit():
+                            pids.append(pid)
+            pids = list(dict.fromkeys(pids))  # dedupe
+    except Exception as e:
+        logger.log(f"⚠️ Could not find process on port {port}: {e}", Colors.YELLOW)
+        return False
+
+    if not pids:
+        return False
+
+    for pid in pids:
+        try:
+            if system in ("Darwin", "Linux"):
+                subprocess.run(["kill", "-9", pid], capture_output=True, timeout=5)
+            else:
+                subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True, timeout=5)
+            logger.log(f"   Killed process {pid}", Colors.CYAN)
+        except Exception:
+            pass
+
+    time.sleep(1)
+    return is_port_free(port)
+
+
 def run_setup_wizard(base_dir, logger):
     """Run the setup.py script if the virtual environment is missing."""
     setup_script = base_dir / "setup.py"
@@ -331,12 +387,16 @@ def run_health_checks(backend_dir, venv_python, logger):
         logger.log("   Please run 'python3 setup.py' to fix dependencies.", Colors.YELLOW)
         return False
 
-    # 4. Check if Port 8000 is free
+    # 4. Check if Port 8000 is free; if busy, try to kill and retry
     if not is_port_free(8000):
-        logger.log("Yo, backend already running on port 8000 — not starting another one.", Colors.YELLOW)
-        logger.log("❌ Port 8000 is busy. Close the existing server or pick another port.", Colors.RED)
-        return False
-    logger.log("✅ Port 8000 is available", Colors.GREEN)
+        logger.log("⚠️ Port 8000 is busy. Killing existing process and retrying...", Colors.YELLOW)
+        if kill_process_on_port(8000, logger):
+            logger.log("✅ Freed port 8000, continuing...", Colors.GREEN)
+        else:
+            logger.log("❌ Port 8000 is still busy. Close the existing server or pick another port.", Colors.RED)
+            return False
+    else:
+        logger.log("✅ Port 8000 is available", Colors.GREEN)
     
     return True
 
