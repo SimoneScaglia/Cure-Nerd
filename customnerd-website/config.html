@@ -1050,9 +1050,12 @@
                             <span id="ollama_ind_model_note" style="margin-left:auto; font-size:0.85em; color:#888;"></span>
                         </div>
                     </div>
-                    <!-- Test connection button row -->
-                    <div style="display:flex; align-items:center; justify-content:flex-end; gap:10px; margin-top:10px; padding-top:10px; border-top:1px solid rgba(0,0,0,0.07);">
+                    <!-- Test connection + Install/Stop + Test button row -->
+                    <div style="display:flex; align-items:center; justify-content:flex-end; gap:10px; margin-top:10px; padding-top:10px; border-top:1px solid rgba(0,0,0,0.07); flex-wrap:wrap;">
                         <div id="ollama_test_result" class="api-test-result" style="display:none; flex:1;"></div>
+                        <button type="button" id="install_stop_btn_ollama" class="api-test-btn" onclick="toggleInstallStopOllama()" style="background: linear-gradient(135deg,#7c3aed,#a855f7); color:#fff; border:none;">
+                            <i class="fas fa-download"></i> Install &amp; Download
+                        </button>
                         <button type="button" id="test_btn_ollama" class="api-test-btn" onclick="testApiKey('ollama')">
                             <i class="fas fa-plug"></i> Test Connection
                         </button>
@@ -1062,9 +1065,12 @@
                 <!-- Dynamic info banner -->
                 <div class="ollama-info-banner" style="background: rgba(124, 58, 237, 0.08); border: 1px solid rgba(124, 58, 237, 0.25); border-radius: 10px; padding: 13px 15px; margin-bottom: 16px;">
                     <p id="ollama_status_banner_text" style="margin: 0; font-size: 0.88em; color: var(--text-color, #444);">
-                        <i class="fas fa-server" style="color: #7c3aed; margin-right: 6px;"></i>Select a model and click <strong>Update Environment Configuration</strong> — the system will handle installation, download, and startup automatically.
+                        <i class="fas fa-list" style="color: #7c3aed; margin-right: 6px;"></i>Follow the manual steps below, or click <strong>Install &amp; Download</strong> to run setup automatically.
                     </p>
                 </div>
+
+                <!-- Manual steps card: shown only when Ollama not installed -->
+                <div id="ollama_manual_steps" style="display:none; border: 1px solid rgba(124,58,237,0.2); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; background: rgba(124,58,237,0.04); font-size: 0.9em;"></div>
 
                 <!-- Model selector -->
                 <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">

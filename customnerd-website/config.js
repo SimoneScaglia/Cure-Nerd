@@ -1800,10 +1800,7 @@ async function updateEnvConfig() {
 
         if (response.ok) {
             showNotification('success', 'Environment Configuration saved successfully!');
-            // If Ollama is the selected provider, automatically run setup
-            if (currentProvider === 'Ollama') {
-                setupOllama(updatedEnvConfig.OLLAMA_MODEL || 'llama3.2');
-            }
+            // Ollama: no auto-install; user clicks "Install & Download" to run setup
         } else {
             showNotification('error', 'Error updating environment configuration.');
         }
@@ -1835,6 +1832,15 @@ async function testApiKey(provider) {
     if (provider !== 'ollama' && !apiKey) {
         _showTestResult(resultEl, false, 'Enter your API key first.');
         return;
+    }
+
+    // For Ollama: if not ready, "Test" runs Install & Download instead of a simple connection check
+    if (provider === 'ollama' && window._ollamaStatusCache) {
+        var ok = window._ollamaStatusCache.data.is_installed && window._ollamaStatusCache.data.is_running && window._ollamaStatusCache.modelPulled;
+        if (!ok) {
+            installAndDownloadOllama();
+            return;
+        }
     }
 
     // Loading state
@@ -1904,7 +1910,7 @@ async function checkOllamaStatus() {
         _setStatusDot(
             'installed',
             data.is_installed,
-            data.is_installed ? 'Found on this machine' : 'Not installed — will be installed automatically'
+            data.is_installed ? 'Found on this machine' : 'Not installed — run python3 setup.py to install'
         );
 
         // Running
@@ -1938,6 +1944,9 @@ async function checkOllamaStatus() {
         // Update dynamic banner
         _updateOllamaBanner(data.is_installed, data.is_running, modelPulled);
 
+        // Manual steps: only when Ollama not installed
+        _renderOllamaManualSteps(data.is_installed, data.manual_steps);
+
     } catch (e) {
         ['installed', 'running', 'model'].forEach(function(k) {
             var dot = document.getElementById('ollama_ind_' + k);
@@ -1947,6 +1956,17 @@ async function checkOllamaStatus() {
         });
         var checkingTxt = document.getElementById('ollama_status_checking');
         if (checkingTxt) { checkingTxt.textContent = '(backend offline — start backend first)'; }
+        // Fallback manual steps when backend is unreachable
+        var container = document.getElementById('ollama_manual_steps');
+        if (container) {
+            container.style.display = 'block';
+            var tip = "If it doesn't work, search, debug, or ask AI for help.".replace(/'/g, '&#39;');
+            container.innerHTML = '<p style="margin:0 0 8px 0; font-size:0.88em; color:#888;">Backend offline. Start the server, then refresh.</p>' +
+                '<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">' +
+                '<code style="background:rgba(124,58,237,0.12); padding:6px 12px; border-radius:6px; font-size:0.9em; border:1px solid rgba(124,58,237,0.25);">python3 setup.py</code>' +
+                '<span title="' + tip + '" style="cursor:help; color:#999;"><i class="fas fa-circle-question"></i></span>' +
+                '</div>';
+        }
         return;
     }
 
@@ -1965,29 +1985,98 @@ function _setStatusDot(key, ok, noteText) {
     if (noteEl) noteEl.textContent = noteText || '';
 }
 
+function _renderOllamaManualSteps(isInstalled, steps) {
+    var container = document.getElementById('ollama_manual_steps');
+    if (!container) return;
+    if (isInstalled) {
+        container.style.display = 'none';
+        return;
+    }
+    container.style.display = 'block';
+    var tooltip = "If it doesn't work, search, debug, or ask AI for help.";
+    var tooltipEsc = tooltip.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+    var html = '<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">' +
+        '<code style="background:rgba(124,58,237,0.12); padding:6px 12px; border-radius:6px; font-size:0.9em; border:1px solid rgba(124,58,237,0.25);">python3 setup.py</code>' +
+        '<span style="font-size:0.85em; color:#777;">Enter password when prompted. Installs Ollama and pulls the model.</span>' +
+        '<span title="' + tooltipEsc + '" style="cursor:help; color:#999; font-size:0.9em;" tabindex="0"><i class="fas fa-circle-question"></i></span>' +
+        '</div>' +
+        '<p style="font-size:0.82em; color:#777; margin:8px 0 0 0;">Then click <strong>Update Environment Configuration</strong> to save.</p>';
+    container.innerHTML = html;
+}
+
 function _updateOllamaBanner(isInstalled, isRunning, modelPulled) {
     var banner = document.getElementById('ollama_status_banner_text');
     if (!banner) return;
     var allReady = isInstalled && isRunning && modelPulled;
     if (allReady) {
         banner.innerHTML = '<i class="fas fa-check-circle" style="color:#28a745;margin-right:6px;"></i>' +
-            '<strong>Ollama is ready!</strong> All systems are running. You can save and start using it now.';
+            '<strong>Ollama is ready!</strong> All systems are running. Save your config and start using it.';
     } else {
-        var missing = [];
-        if (!isInstalled) missing.push('install Ollama');
-        if (!isRunning)   missing.push('start the server');
-        if (!modelPulled) missing.push('pull the selected model');
-        banner.innerHTML = '<i class="fas fa-magic" style="color:#7c3aed;margin-right:6px;"></i>' +
-            'Click <strong>Update Environment Configuration</strong> to automatically: ' +
-            missing.join(' \u2192 ') + '.';
+        banner.innerHTML = '<i class="fas fa-list" style="color:#7c3aed;margin-right:6px;"></i>' +
+            'Follow the <strong>manual steps</strong> below, run <strong>python3 setup.py</strong>, or click <strong>Install & Download</strong>.';
     }
 }
 
 // ── End Ollama pre-flight ────────────────────────────────────────────────────
 
-function setupOllama(model) {
+/**
+ * Single button: Install when idle, Force Stop when running.
+ */
+function toggleInstallStopOllama() {
+    if (window._ollamaSetupEventSource) {
+        forceStopOllamaSetup();
+    } else {
+        installAndDownloadOllama();
+    }
+}
+
+function forceStopOllamaSetup() {
+    var es = window._ollamaSetupEventSource;
+    if (es) {
+        es.close();
+        window._ollamaSetupEventSource = null;
+    }
+    var title = document.getElementById('ollama_panel_title');
+    var spinner = document.getElementById('ollama_panel_spinner');
+    var log = document.getElementById('ollama_setup_log');
+    _showInstallButton();
+    if (title) { title.textContent = 'Stopped by user'; title.style.color = '#6c757d'; }
+    if (spinner) spinner.style.display = 'none';
+    if (log) log.textContent += '\n[Stopped by user]\n';
+    if (typeof window._ollamaSetupOnComplete === 'function') {
+        window._ollamaSetupOnComplete();
+        window._ollamaSetupOnComplete = null;
+    }
+}
+
+function _showInstallButton() {
+    var btn = document.getElementById('install_stop_btn_ollama');
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-download"></i> Install &amp; Download';
+        btn.style.background = 'linear-gradient(135deg,#7c3aed,#a855f7)';
+    }
+}
+
+function installAndDownloadOllama() {
+    var modelEl = document.getElementById('OLLAMA_MODEL');
+    var model = (modelEl && modelEl.value) ? modelEl.value.trim() : 'llama3.2';
+    if (!model) model = 'llama3.2';
+    var btn = document.getElementById('install_stop_btn_ollama');
+    if (btn) {
+        btn.innerHTML = '<i class="fas fa-stop"></i> Force Stop';
+        btn.style.background = '#dc3545';
+    }
+    setupOllama(model, function onComplete() {
+        _showInstallButton();
+    });
+}
+
+function setupOllama(model, onComplete) {
     if (!model) model = (document.getElementById('OLLAMA_MODEL') || {}).value || 'llama3.2';
     model = model.trim();
+    if (typeof onComplete !== 'function') onComplete = function() {};
+    window._ollamaSetupOnComplete = onComplete;
 
     const panel = document.getElementById('ollama_setup_panel');
     const log   = document.getElementById('ollama_setup_log');
@@ -2026,6 +2115,7 @@ function setupOllama(model) {
 
     var url = baseURL + '/ollama_setup?model=' + encodeURIComponent(model);
     var es = new EventSource(url);
+    window._ollamaSetupEventSource = es;
 
     es.onmessage = function(e) {
         try {
@@ -2054,6 +2144,9 @@ function setupOllama(model) {
                     if (title) { title.textContent = 'Setup failed'; title.style.color = '#dc3545'; }
                     if (spinner) spinner.style.display = 'none';
                     es.close();
+                    window._ollamaSetupEventSource = null;
+                    window._ollamaSetupOnComplete = null;
+                    onComplete();
                     break;
                 case 'complete':
                     if (step > 0) setStep(step, 'done');
@@ -2062,6 +2155,9 @@ function setupOllama(model) {
                     if (spinner) spinner.style.display = 'none';
                     showNotification('success', 'Ollama setup complete — model is ready to use!');
                     es.close();
+                    window._ollamaSetupEventSource = null;
+                    window._ollamaSetupOnComplete = null;
+                    onComplete();
                     break;
                 default:
                     // install_log / pull_log / progress
@@ -2077,6 +2173,9 @@ function setupOllama(model) {
         if (title) { title.textContent = 'Setup stream ended'; title.style.color = '#6c757d'; }
         if (spinner) spinner.style.display = 'none';
         es.close();
+        window._ollamaSetupEventSource = null;
+        window._ollamaSetupOnComplete = null;
+        onComplete();
     };
 }
 

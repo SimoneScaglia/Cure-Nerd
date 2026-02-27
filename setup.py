@@ -92,6 +92,204 @@ def display_manual_instructions(logger, title, steps, color=Colors.CYAN):
     logger.log("╚" + "═" * 68 + "╝", Colors.BOLD + Colors.MAGENTA)
     logger.log("", Colors.RESET)
 
+
+def display_ollama_manual_instructions(logger, platform_name):
+    """
+    Display manual installation steps for Ollama when the terminal install fails.
+    Used as backup after a failed automated install attempt.
+    """
+    common_steps = [
+        {
+            "title": "Verify server and pull a model",
+            "commands": [
+                "ollama --version",
+                "ollama serve           # if the server is not already running",
+                "ollama pull llama3.2:1b",
+                "curl http://localhost:11434/api/tags"
+            ],
+        },
+        {
+            "title": "Connect Custom-Nerd to Ollama",
+            "commands": [
+                "In customnerd-backend/variables.env set:",
+                '  LLM="Ollama"',
+                '  OLLAMA_MODEL="llama3.2:1b"',
+                '  OLLAMA_BASE_URL="http://localhost:11434"',
+                "Then use the Config page → Update Environment Configuration → Test Connection"
+            ],
+        },
+    ]
+    if platform_name == "Mac":
+        steps = [
+            {
+                "title": "Option A — Install the macOS app",
+                "commands": [
+                    "Open https://ollama.com in your browser",
+                    "Download the macOS app and move it to /Applications",
+                    "Open the Ollama app once to start the local server"
+                ],
+            },
+            {
+                "title": "Option B — Terminal install",
+                "commands": [
+                    "Open the macOS Terminal app",
+                    "Run: curl -fsSL https://ollama.com/install.sh | sh",
+                ],
+                "notes": [
+                    "The script may ask for your macOS password — enter it when prompted.",
+                ],
+            },
+        ] + common_steps
+    elif platform_name == "Windows":
+        steps = [
+            {
+                "title": "Install inside WSL (Ubuntu)",
+                "commands": [
+                    "Open PowerShell or CMD, run: wsl -d Ubuntu",
+                    "Run: curl -fsSL https://ollama.com/install.sh | sh",
+                    "Enter your Linux/sudo password if prompted.",
+                ],
+                "notes": [
+                    "Ollama runs as a Linux app inside WSL. Use the same terminal session for ollama serve.",
+                ],
+            },
+        ] + common_steps
+    else:
+        # Linux (native or WSL)
+        steps = [
+            {
+                "title": "Install Ollama",
+                "commands": [
+                    "curl -fsSL https://ollama.com/install.sh | sh",
+                ],
+                "notes": [
+                    "Enter your sudo password when prompted.",
+                ],
+            },
+        ] + common_steps
+
+    display_manual_instructions(logger, "📥 MANUAL OLLAMA INSTALLATION (Backup)", steps, color=Colors.CYAN)
+
+
+def install_ollama_step(logger, platform_name, step_results, backend_dir):
+    """
+    Attempt to install Ollama via terminal. Runs actual install commands.
+    If password is required, user enters it in the attached terminal.
+    On failure, displays manual instructions as backup.
+    Supports: Mac, Linux (native), Linux (WSL/Windows).
+    """
+    OLLAMA_MODEL_DEFAULT = "llama3.2:1b"
+
+    # 1. Check if already installed
+    ollama_path = shutil.which("ollama")
+    if ollama_path:
+        logger.log("", Colors.RESET)
+        logger.log("✅ Ollama is already installed.", Colors.GREEN)
+        logger.log(f"   Path: {ollama_path}", Colors.CYAN)
+        # Still try to pull the default model if not present
+        try:
+            result = subprocess.run(
+                ["ollama", "list"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                cwd=str(backend_dir)
+            )
+            has_model = OLLAMA_MODEL_DEFAULT in (result.stdout or "") if result.returncode == 0 else False
+        except Exception:
+            has_model = False
+
+        if not has_model:
+            logger.log(f"   Pulling default model '{OLLAMA_MODEL_DEFAULT}'...", Colors.CYAN)
+            try:
+                run_command_with_output(
+                    ["ollama", "pull", OLLAMA_MODEL_DEFAULT],
+                    logger,
+                    description=f"Pulling {OLLAMA_MODEL_DEFAULT}",
+                    timeout=600,
+                    cwd=str(backend_dir)
+                )
+                step_results.append(("Step 6: Ollama (optional)", "PASSED", f"Already installed, pulled {OLLAMA_MODEL_DEFAULT}"))
+            except subprocess.CalledProcessError:
+                step_results.append(("Step 6: Ollama (optional)", "WARNING", f"Model pull failed — run 'ollama pull {OLLAMA_MODEL_DEFAULT}' manually"))
+        else:
+            step_results.append(("Step 6: Ollama (optional)", "PASSED", "Already installed with default model"))
+        return
+
+    # 2. Not installed — try terminal install
+    logger.log("", Colors.RESET)
+    logger.log("🤖 Step 6: Optional — Install Ollama (local AI)", Colors.BLUE)
+    logger.log("   Ollama lets you run AI models locally without API keys.", Colors.CYAN)
+    logger.log("", Colors.RESET)
+
+    if not sys.stdin.isatty():
+        logger.log("⚠️ Non-interactive terminal — cannot run installer (may require password).", Colors.YELLOW)
+        logger.log("   Skipping automated install. See manual steps below.", Colors.CYAN)
+        display_ollama_manual_instructions(logger, platform_name)
+        step_results.append(("Step 6: Ollama (optional)", "SKIPPED", "Non-interactive — install manually"))
+        return
+
+    logger.log("   Running: curl -fsSL https://ollama.com/install.sh | sh", Colors.CYAN)
+    logger.log("   If prompted for a password, enter it in this terminal.", Colors.YELLOW)
+    logger.log("", Colors.RESET)
+
+    try:
+        # Run with inherited stdin/stdout/stderr so user can type password
+        proc = subprocess.run(
+            ["sh", "-c", "curl -fsSL https://ollama.com/install.sh | sh"],
+            cwd=str(backend_dir),
+            timeout=300,
+        )
+        if proc.returncode != 0:
+            raise subprocess.CalledProcessError(proc.returncode, "curl | sh")
+    except subprocess.TimeoutExpired:
+        logger.log("❌ Ollama install timed out.", Colors.RED)
+        display_ollama_manual_instructions(logger, platform_name)
+        step_results.append(("Step 6: Ollama (optional)", "FAILED", "Install timed out"))
+        return
+    except subprocess.CalledProcessError as e:
+        logger.log(f"❌ Ollama install failed (exit code {e.returncode}).", Colors.RED)
+        display_ollama_manual_instructions(logger, platform_name)
+        step_results.append(("Step 6: Ollama (optional)", "FAILED", "Install script failed"))
+        return
+    except Exception as e:
+        logger.log(f"❌ Ollama install error: {e}", Colors.RED)
+        display_ollama_manual_instructions(logger, platform_name)
+        step_results.append(("Step 6: Ollama (optional)", "FAILED", str(e)))
+        return
+
+    # 3. Verify installation (check common install locations; PATH may not be updated in this session)
+    ollama_path = shutil.which("ollama")
+    if not ollama_path:
+        for candidate in ["/usr/local/bin/ollama", "/usr/bin/ollama"]:
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                ollama_path = candidate
+                break
+    if not ollama_path:
+        logger.log("❌ Ollama install completed but 'ollama' not found.", Colors.RED)
+        logger.log("   Open a new terminal (PATH may need refresh) or run: export PATH=$PATH:/usr/local/bin", Colors.CYAN)
+        display_ollama_manual_instructions(logger, platform_name)
+        step_results.append(("Step 6: Ollama (optional)", "FAILED", "ollama not on PATH"))
+        return
+
+    logger.log("✅ Ollama installed successfully.", Colors.GREEN)
+    logger.log(f"   Pulling default model '{OLLAMA_MODEL_DEFAULT}'...", Colors.CYAN)
+
+    ollama_cmd = ollama_path if ollama_path else "ollama"
+    try:
+        run_command_with_output(
+            [ollama_cmd, "pull", OLLAMA_MODEL_DEFAULT],
+            logger,
+            description=f"Pulling {OLLAMA_MODEL_DEFAULT}",
+            timeout=600,
+            cwd=str(backend_dir)
+        )
+        step_results.append(("Step 6: Ollama (optional)", "PASSED", f"Installed and pulled {OLLAMA_MODEL_DEFAULT}"))
+    except subprocess.CalledProcessError:
+        logger.log(f"⚠️ Model pull failed. Run manually: ollama pull {OLLAMA_MODEL_DEFAULT}", Colors.YELLOW)
+        step_results.append(("Step 6: Ollama (optional)", "WARNING", "Installed; model pull failed — run manually"))
+
+
 def strip_ansi(text):
     ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
     return ansi_escape.sub('', text)
@@ -1783,67 +1981,67 @@ def main():
                 venv_dir = backend_dir / "nerd_engine_venv"
                 venv_actual_dir = venv_dir
             
-        logger.log("⏳ Creating virtual environment...", Colors.RESET)
-        
-        # Prefer Python 3.11 on WSL if available
-        python_executable = sys.executable
-        if is_wsl:
-            try:
-                python311_check = subprocess.run(
-                    ["python3.11", "--version"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5
-                )
-                if python311_check.returncode == 0:
-                    python_executable = "python3.11"
-                    logger.log("✅ Using Python 3.11 for virtual environment (recommended for WSL)", Colors.GREEN)
-            except Exception:
-                pass  # Fall back to default python
-        
-        max_retries = 3  # First attempt + one retry after fixing
-        
-        for attempt in range(max_retries):
-            try:
-                # Use venv_actual_dir for creation (Linux-native location if on Windows mount)
-                returncode, stdout, stderr = run_command_with_output(
-                    [python_executable, "-m", "venv", str(venv_actual_dir)],
-                    logger,
-                    description="Creating virtual environment",
-                    cwd=str(backend_dir)
-                )
-                
-                if returncode == 0:
-                    venv_created = True
-                    # If on Windows mount, create symlink
-                    if is_windows_mount:
-                        # Remove existing symlink or directory if it exists
-                        if venv_dir.exists() or venv_dir.is_symlink():
-                            if venv_dir.is_symlink():
-                                venv_dir.unlink()
-                            else:
-                                import shutil
-                                shutil.rmtree(venv_dir)
-                        # Create symlink
-                        venv_dir.symlink_to(venv_actual_dir)
-                        logger.log(f"✅ Created symlink: {venv_dir} -> {venv_actual_dir}", Colors.GREEN)
-                    step_results.append(("Step 3: Create virtual environment", "PASSED", f"Created: {venv_dir.name}"))
-                    break
-                else:
-                    # This should not happen as run_command_with_output raises on non-zero
-                    # But handle it just in case
-                    error_output = (stderr + stdout).lower() if stderr or stdout else ""
-                    full_error = (stderr + stdout) if stderr or stdout else ""
-                    
-                    # Detect all possible venv/ensurepip errors
-                    is_venv_error = (
-                        "ensurepip is not available" in error_output or
-                        "no module named ensurepip" in error_output or
-                        "python3-venv" in error_output or
-                        ("python" in error_output and "venv" in error_output and "not available" in error_output) or
-                        ("venv" in error_output and "failed" in error_output)
+            logger.log("⏳ Creating virtual environment...", Colors.RESET)
+            
+            # Prefer Python 3.11 on WSL if available
+            python_executable = sys.executable
+            if is_wsl:
+                try:
+                    python311_check = subprocess.run(
+                        ["python3.11", "--version"],
+                        capture_output=True,
+                        text=True,
+                        timeout=5
                     )
-            except subprocess.CalledProcessError as e:
+                    if python311_check.returncode == 0:
+                        python_executable = "python3.11"
+                        logger.log("✅ Using Python 3.11 for virtual environment (recommended for WSL)", Colors.GREEN)
+                except Exception:
+                    pass  # Fall back to default python
+            
+            max_retries = 3  # First attempt + one retry after fixing
+            
+            for attempt in range(max_retries):
+                try:
+                    # Use venv_actual_dir for creation (Linux-native location if on Windows mount)
+                    returncode, stdout, stderr = run_command_with_output(
+                        [python_executable, "-m", "venv", str(venv_actual_dir)],
+                        logger,
+                        description="Creating virtual environment",
+                        cwd=str(backend_dir)
+                    )
+                    
+                    if returncode == 0:
+                        venv_created = True
+                        # If on Windows mount, create symlink
+                        if is_windows_mount:
+                            # Remove existing symlink or directory if it exists
+                            if venv_dir.exists() or venv_dir.is_symlink():
+                                if venv_dir.is_symlink():
+                                    venv_dir.unlink()
+                                else:
+                                    import shutil
+                                    shutil.rmtree(venv_dir)
+                            # Create symlink
+                            venv_dir.symlink_to(venv_actual_dir)
+                            logger.log(f"✅ Created symlink: {venv_dir} -> {venv_actual_dir}", Colors.GREEN)
+                        step_results.append(("Step 3: Create virtual environment", "PASSED", f"Created: {venv_dir.name}"))
+                        break
+                    else:
+                        # This should not happen as run_command_with_output raises on non-zero
+                        # But handle it just in case
+                        error_output = (stderr + stdout).lower() if stderr or stdout else ""
+                        full_error = (stderr + stdout) if stderr or stdout else ""
+                        
+                        # Detect all possible venv/ensurepip errors
+                        is_venv_error = (
+                            "ensurepip is not available" in error_output or
+                            "no module named ensurepip" in error_output or
+                            "python3-venv" in error_output or
+                            ("python" in error_output and "venv" in error_output and "not available" in error_output) or
+                            ("venv" in error_output and "failed" in error_output)
+                        )
+                except subprocess.CalledProcessError as e:
                     # run_command_with_output raises CalledProcessError on non-zero exit
                     # The error output was already logged by run_command_with_output
                     
@@ -2316,6 +2514,8 @@ def main():
 NCBI_API_KEY=""
 OPENAI_API_KEY=""
 GEMINI_API_KEY=""
+OLLAMA_MODEL="llama3.2:1b"
+OLLAMA_BASE_URL="http://localhost:11434"
 ELSEVIER_API_KEY=""
 SPRINGER_API_KEY=""
 WILEY_API_KEY=""
@@ -2335,6 +2535,11 @@ ADS_API_TOKEN=""
         except Exception as e:
             step_results.append(("Step 5: Generate environment file", "FAILED", f"Error: {e}"))
             logger.log(f"⚠️ Could not create environment file: {e}", Colors.YELLOW)
+
+        # 6. Optional: Install Ollama (Mac, Linux, WSL)
+        # Runs terminal install; if password required, user enters it in this session.
+        # On failure, shows manual instructions as backup.
+        install_ollama_step(logger, platform_name, step_results, backend_dir)
 
         # 9. Display summary
         logger.log("", Colors.RESET)

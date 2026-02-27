@@ -1635,11 +1635,15 @@ async def ollama_status():
         except Exception:
             pass
 
+    # Manual installation: setup.py only (shown when not installed)
+    manual_steps = [] if is_installed else [{"title": "Run setup.py", "commands": ["python3 setup.py"], "notes": ["Enter password when prompted. Installs Ollama and pulls the model."]}]
+
     return {
         "is_installed": is_installed,
         "is_running": is_running,
         "installed_models": installed_models,
         "platform": system,
+        "manual_steps": manual_steps,
     }
 
 
