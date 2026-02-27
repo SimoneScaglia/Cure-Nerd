@@ -1539,6 +1539,11 @@ def main():
         logger.log("   and run the script again. The script will resume from where it left off.", Colors.CYAN)
         logger.log("", Colors.RESET)
         logger.log("✨ Let's get your environment up and running...", Colors.RESET)
+        logger.log("", Colors.RESET)
+        logger.log("📌 You may need to type in the terminal twice:", Colors.CYAN)
+        logger.log("   1) Use existing venv? → say yes.", Colors.RESET)
+        logger.log("   2) Password for Ollama (last step).", Colors.RESET)
+        logger.log("", Colors.RESET)
 
         # 1. Detect OS and Platform
         os_name = platform.system()

@@ -148,6 +148,8 @@ python3 setup.py
 
 **⏰ Important:** `setup.py` will take a couple of hours to complete. Please wait patiently - this is normal! The script is downloading and installing many packages, which takes time.
 
+**You may need to type in the terminal twice:** (1) Use existing venv? → say yes. (2) Password for Ollama (last step).
+
 Wait for it to finish. Do not interrupt the process.
 
 **Note:** If `setup.py` fails on the first run, don't worry! This is common. Check what failed in the error messages, fix any issues (if needed), and run the script again. The script will resume from where it left off and fix most issues automatically.

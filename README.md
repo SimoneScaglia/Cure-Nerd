@@ -236,7 +236,7 @@ The tool is designed to provide reliable and up-to-date information for individu
    python3 setup.py
    ```
    
-   **⏰ Important:** `setup.py` will take a couple of hours to complete. Please wait patiently - this is normal!
+   **⏰ Important:** `setup.py` will take a couple of hours to complete. Please wait patiently - this is normal! You may need to type twice: (1) Use existing venv? → say yes. (2) Password for Ollama (last step).
 
 7. **Start server:**
    ```bash
@@ -258,7 +258,7 @@ The tool is designed to provide reliable and up-to-date information for individu
    ```bash
    python3 setup.py
    ```
-   **⏰ Important:** `setup.py` will take a couple of hours to complete. Please wait patiently - this is normal!
+   **⏰ Important:** `setup.py` will take a couple of hours to complete. Please wait patiently - this is normal! You may need to type twice: (1) Use existing venv? → say yes. (2) Password for Ollama (last step).
 
 4. **Start server:**
    ```bash
