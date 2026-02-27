@@ -13,7 +13,7 @@ Custom-Nerd/Nerd-Engine is a modular, configuration-driven research assistant en
 
 ## TL;DR
 
-- What: Modular, configuration-driven research assistant engine (FastAPI + JS + OpenAI) that searches external sources and synthesizes evidence-backed answers.
+- What: Modular, configuration-driven research assistant engine (FastAPI + JS + OpenAI/Gemini/Claude/Ollama) that searches external sources and synthesizes evidence-backed answers.
 - Domains: DietNerd (PubMed), NewsNerd (GNews/NewsAPI/Guardian), SpaceNerd (arXiv/NASA/ADS), SciNer (QASPER dataset-based), CloudNerd (Stack Overflow).
 - Run it:
   - **macOS/Linux:** 
@@ -23,8 +23,8 @@ Custom-Nerd/Nerd-Engine is a modular, configuration-driven research assistant en
     1) Open PowerShell as Administrator → `python presetup.py` (sets up WSL2/Ubuntu; may fail first time - let it complete, restart, then run again)
     2) `python setup.py` (runs inside WSL2)
     3) `python run.py` (runs inside WSL2)
-  - Then: Open the Configuration page → add API keys → save.
-- Keys: OPENAI_API_KEY (or GEMINI_API_KEY, or ANTHROPIC_API_KEY). Optional per domain: GNEWS_API_KEY, NEWS_API_KEY, GUARDIAN_API_KEY, ELSEVIER_API_KEY, SPRINGER_API_KEY, WILEY_API_KEY, OXFORD_API_KEY, OXFORD_APP_HEADER, ADS_API_TOKEN.
+  - Then: Open the Configuration page → add API keys (or choose Ollama for fully local operation) → save.
+- Keys: OPENAI_API_KEY, GEMINI_API_KEY, or ANTHROPIC_API_KEY (Claude)—one required for cloud providers. **Ollama requires no API key**—select it in the Environment tab and use the built-in setup flow to install and run models locally. Optional per domain: GNEWS_API_KEY, NEWS_API_KEY, GUARDIAN_API_KEY, ELSEVIER_API_KEY, SPRINGER_API_KEY, WILEY_API_KEY, OXFORD_API_KEY, OXFORD_APP_HEADER, ADS_API_TOKEN.
 - Configure: Frontend, Backend Prompts, Environment, User Flow, Save/Load State.
 
 ## Table of Contents
@@ -68,7 +68,8 @@ Custom-Nerd/Nerd-Engine is a modular, configuration-driven research assistant en
 - State save/restore (DietNerd/NewsNerd/SpaceNerd/CloudNerd patterns)
 
 ### Essential Keys
-- Required: OPENAI_API_KEY (or GEMINI_API_KEY, or ANTHROPIC_API_KEY)
+- Required (choose one cloud provider): OPENAI_API_KEY, GEMINI_API_KEY, or ANTHROPIC_API_KEY (Claude). Set `LLM` in Environment Configuration to the provider you use.
+- **Ollama (local, no key needed)**: Select `Ollama` in the Environment tab, pick a model, and click "Setup Ollama" — the system installs Ollama, pulls the model, and starts the server automatically.
 - Optional by domain: ELSEVIER_API_KEY, SPRINGER_API_KEY, WILEY_API_KEY, OXFORD_API_KEY, OXFORD_APP_HEADER, GNEWS_API_KEY, NEWS_API_KEY, GUARDIAN_API_KEY, ADS_API_TOKEN
 
 ### Docs
@@ -157,7 +158,7 @@ The tool is designed to provide reliable and up-to-date information for individu
 - Frontend: HTML, CSS, JavaScript
 - Backend: FastAPI, Python
 - Databases: MySQL
-- LLM Integration: OpenAI GPT, Google Gemini & Anthropic Claude (configurable)
+- LLM Integration: OpenAI GPT, Google Gemini, Anthropic Claude, or **Ollama (local)** — configurable via the Environment tab in the Configuration UI. Ollama uses the OpenAI-compatible REST API (`http://localhost:11434/v1/`) so no separate SDK is required.
 
 ## Project Structure
 
@@ -189,7 +190,7 @@ The tool is designed to provide reliable and up-to-date information for individu
 
 ## Quick Installation
 
-> **💡 Tip:** If you encounter errors during installation, try using ChatGPT, Claude, or Gemini - they are really helpful for debugging installation issues!
+> **💡 Tip:** If you encounter errors during installation, try using ChatGPT or Gemini - they are really helpful for debugging installation issues!
 
 ### Prerequisites
 - Python 3.11 or 3.12 ([Download Python 3.11.9](https://www.python.org/downloads/release/python-3119/))
@@ -271,11 +272,11 @@ The tool is designed to provide reliable and up-to-date information for individu
   - `logs/presetup/` - Windows WSL setup logs
   - `logs/setup/` - Installation logs
   - `logs/run/` - Server run logs
-- **Troubleshooting:** If you encounter errors, check the logs and try using ChatGPT, Claude, or Gemini for help.
+- **Troubleshooting:** If you encounter errors, check the logs and try using ChatGPT or Gemini for help.
 
 ### Configure API Keys
 
-After installation, open `customnerd-backend/variables.env` and add your `OPENAI_API_KEY`, `GEMINI_API_KEY`, or `ANTHROPIC_API_KEY` (at least one required).
+After installation, open `customnerd-backend/variables.env` and add your `OPENAI_API_KEY` (required).
 
 ## Step 8: Update Environment Keys (REQUIRED)
 
@@ -307,7 +308,7 @@ The system cannot function without valid API keys - this step is mandatory befor
 
 ## Troubleshooting Tip
 
-There will be moments when you might get stuck due to errors. If that happens, copy the exact terminal error message and paste it into **ChatGPT, Claude, or Gemini**. These AI tools can help you quickly troubleshoot and resolve issues.
+There will be moments when you might get stuck due to errors. If that happens, copy the exact terminal error message and paste it into **ChatGPT or Gemini**. These AI tools can help you quickly troubleshoot and resolve issues.
 
 
 ## Configuring Custom-Nerd/Nerd-Engine
@@ -349,9 +350,11 @@ This tab allows you to configure backend parameters such as:
 
 This tab allows you to update all your API keys and environment variables:
 - **NCBI_API_KEY**: Update your NCBI API key here. [Get API Key](https://support.nlm.nih.gov/kbArticle/?pn=KA-05317)
-- **OPENAI_API_KEY**: Update your OpenAI API key here. [Get API Key](https://openai.com/index/openai-api/)
-- **GEMINI_API_KEY**: Update your Google Gemini API key here. [Get API Key](https://ai.google.dev/)
-- **ANTHROPIC_API_KEY**: Update your Anthropic Claude API key here. [Get API Key](https://console.anthropic.com/)
+- **AI Provider**: Choose OpenAI, Gemini, Claude, or **Ollama** via the 4-segment pill. Only the selected provider’s key is required (Ollama needs no key).
+- **OPENAI_API_KEY**: Update your OpenAI API key here. [Get API Key](https://openai.com/index/openai-api/) — “Test” button validates the key inline.
+- **GEMINI_API_KEY**: Update your Google Gemini API key here. [Get API Key](https://ai.google.dev/) — “Test” button validates the key inline.
+- **ANTHROPIC_API_KEY**: Update your Anthropic (Claude) API key here. [Get API Key](https://console.anthropic.com/settings/keys) — “Test” button validates the key inline.
+- **Ollama (local)**: No API key needed. Select a model from the dropdown (`llama3.2`, `phi3:mini`, `llama3.1:8b`, `qwen3:8b`, `codellama:7b`, `kimi-k2.5:cloud`, or custom). Click “Model Guide” (❓) to see a filterable table with RAM/disk requirements, speed, quality, and a Basic/Advanced view toggle. Click “Setup Ollama” to automatically install Ollama, pull the chosen model, and start the server. Click “Test Connection” to verify the local server is reachable.
 - **ELSEVIER_API_KEY**: Update your Elsevier API key here. [Get API Key](https://dev.elsevier.com/apikey/manage)
 - **SPRINGER_API_KEY**: Update your Springer API key here. [Get API Key](https://dev.springernature.com/docs/quick-start/api-access/)
 - **WILEY_API_KEY**: Update your Wiley API key here. [Get API Key](https://onlinelibrary.wiley.com/library-info/resources/text-and-datamining)
@@ -523,8 +526,9 @@ Before you begin, ensure you have the following installed:
 - A modern web browser (Chrome, Firefox, Safari, or Edge)
 - Virtual environment tool (venv or conda)
 
-Required API Keys:
-- OpenAI API Key (or Google Gemini API Key, or Anthropic Claude API Key)
+Required API Keys (one LLM key required):
+- OpenAI API Key, Google Gemini API Key, or Anthropic (Claude) API Key — set `LLM` in Configuration to match
+- **Or use Ollama (no key required)** — select `Ollama` in the Environment tab and use the built-in setup flow
 - NCBI API Key
 - Elsevier API Key
 - Springer API Key
@@ -621,15 +625,28 @@ Please ensure your code:
     - Use Load/Save State to persist and restore known-good configs
     - Hard Reset only if necessary; re-enter keys afterward
 
+14. **Ollama Not Installing or Model Not Found**
+    - Click "Setup Ollama" in the Environment tab and watch the step-by-step SSE progress log for the exact failure point
+    - macOS: if the curl script fails, ensure Homebrew is installed (`brew --version`) or allow the binary download to `/usr/local/bin`
+    - Linux: the script tries `curl … | sh` then falls back to a direct binary download to `~/.local/bin` — ensure `~/.local/bin` is on your `$PATH`
+    - Windows: run PowerShell as Administrator; if `irm … | iex` fails, ensure `winget` is available (update Windows or install App Installer from the Microsoft Store)
+    - If Ollama is installed but the model is not found: open a terminal and run `ollama pull <model_name>` manually, then retry
+    - If the server is not running: run `ollama serve` in a separate terminal window, then use "Test Connection" in the config UI to confirm
+
+15. **Ollama Model Errors During Query Processing**
+    - `model '…' not found` — the selected model hasn't been pulled; use the "Setup Ollama" flow or run `ollama pull <model>` in a terminal
+    - `Cannot connect to Ollama server` — run `ollama serve` and ensure nothing is blocking port 11434
+    - After fixing, reload the Environment tab and save to reinitialize the client without restarting the backend
+
 ## FAQ
 
 ### General Questions
 
 **Q: What is the minimum system requirement?**
-A: Any modern computer with 4GB RAM and a stable internet connection.
+A: For cloud providers (OpenAI/Gemini/Claude): any modern computer with 4 GB RAM and a stable internet connection. For Ollama (local models): 8 GB RAM minimum (16 GB recommended for 7B+ parameter models); M-series MacBooks or modern Intel/AMD CPUs work well for models up to 8B parameters.
 
 **Q: Can I use Custom-Nerd/Nerd-Engine offline?**
-A: No, Custom-Nerd/Nerd-Engine requires internet connection for API access and updates.
+A: Partially. With Ollama, LLM inference runs fully locally with no internet needed. However, querying academic databases (PubMed, Springer, etc.) still requires an internet connection. For a fully offline setup you would need to pre-load data or use local document (PDF) search only.
 
 **Q: How often is the academic database updated?**
 A: The system uses real-time API connections to academic databases, ensuring the latest information.
@@ -637,7 +654,10 @@ A: The system uses real-time API connections to academic databases, ensuring the
 ### Technical Questions
 
 **Q: Can I use a different LLM instead of GPT?**
-A: Yes, the system is designed to be modular. You can configure different LLMs—OpenAI (GPT), Google (Gemini), or Anthropic (Claude)—in the backend configuration.
+A: Yes. The system supports OpenAI, Google Gemini, Anthropic Claude, and **Ollama** (local models). Switch providers from the Environment tab — a 4-segment pill lets you select the provider, and each cloud provider has an inline "Test" button to verify the key. For Ollama, no API key is needed; use the built-in "Setup Ollama" flow to install and run models locally.
+
+**Q: Can I run Custom-Nerd/Nerd-Engine without any cloud API subscription?**
+A: Yes. Select **Ollama** as the LLM provider in the Environment tab. The system will automatically install Ollama on your machine, download the chosen model, and start the local server — no external API calls are made during inference. You still need an internet connection for the initial model download and for querying academic databases.
 
 **Q: How do I add support for new academic databases?**
 A: You can add new database support through the User Flow Configuration panel.

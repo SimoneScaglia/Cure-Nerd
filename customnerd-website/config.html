@@ -56,13 +56,16 @@
             --glow: rgba(0,123,255,0.12); /* subtle blue glow on OpenAI */
             --glow-2: rgba(40,167,69,0.12); /* subtle green glow on Gemini */
             --glow-3: rgba(194,120,0,0.12); /* subtle orange glow on Claude */
+            --glow-4: rgba(124,58,237,0.14); /* subtle purple glow on Ollama */
             --accent-a: linear-gradient(135deg,var(--accent-text-color, #007bff),var(--accent-border-color, #0056b3)); /* blue for OpenAI */
             --accent-b: linear-gradient(135deg,#28a745,#20c997); /* green for Gemini */
             --accent-c: linear-gradient(135deg,#c27800,#e69b00); /* orange for Claude */
+            --accent-d: linear-gradient(135deg,#7c3aed,#a855f7); /* purple for Ollama */
 
             /* Size tokens */
             --w: 220px;
             --w-3: 320px; /* width for 3-segment switch */
+            --w-4: 420px; /* width for 4-segment switch */
             --h: 46px;
             --r: 999px;
             --gap: 2px; /* micro gap between slider and pill edges */
@@ -120,6 +123,39 @@
             background: var(--accent-c);
         }
 
+        /* 4-segment pill */
+        .seg-switch-4 {
+            width: var(--w-4);
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+        }
+
+        .seg-switch-4 .seg-slider {
+            width: calc(25% - var(--gap));
+            transform: translateX(0%);
+        }
+
+        .seg-switch-4[data-side="center"] .seg-slider {
+            transform: translateX(100%);
+            background: var(--accent-b);
+        }
+
+        .seg-switch-4[data-side="right"] .seg-slider {
+            transform: translateX(200%);
+            background: var(--accent-c);
+        }
+
+        .seg-switch-4[data-side="far-right"] .seg-slider {
+            transform: translateX(300%);
+            background: var(--accent-d);
+        }
+
+        @media (max-width: 480px) {
+            .seg-switch-4 {
+                width: 100%;
+                max-width: var(--w-4);
+            }
+        }
+
         /* Slider */
         .seg-slider {
             position: absolute;
@@ -134,7 +170,7 @@
             box-shadow: 0 2px 6px rgba(0,0,0,.15);
         }
 
-        .seg-switch[data-side="right"]:not(.seg-switch-3) .seg-slider {
+        .seg-switch[data-side="right"]:not(.seg-switch-3):not(.seg-switch-4) .seg-slider {
             transform: translateX(100%);
             background: var(--accent-b);
         }
@@ -161,7 +197,11 @@
             font-size: var(--font);
             line-height: 1;
             letter-spacing: .2px;
-            padding: 0; /* make sure there is no added padding */
+            padding: 0;
+            cursor: pointer;
+            pointer-events: all;
+            border-radius: var(--r);
+            transition: color var(--dur) var(--spring);
         }
 
         .seg-label .icon {
@@ -172,28 +212,36 @@
         /* Active text color flips based on slider side */
         .seg-switch[data-side="left"] .seg-label--left,
         .seg-switch[data-side="right"] .seg-label--right,
-        .seg-switch[data-side="center"] .seg-label--center {
+        .seg-switch[data-side="center"] .seg-label--center,
+        .seg-switch[data-side="far-right"] .seg-label--far-right {
             color: var(--active);
             text-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
 
         /* Very subtle ambient glow that changes with side */
         .seg-switch[data-side="left"] { box-shadow: var(--shadow), 0 0 0 2px var(--glow) inset, var(--inner); }
-        .seg-switch[data-side="right"]:not(.seg-switch-3) { box-shadow: var(--shadow), 0 0 0 2px var(--glow-2) inset, var(--inner); }
+        .seg-switch[data-side="right"]:not(.seg-switch-3):not(.seg-switch-4) { box-shadow: var(--shadow), 0 0 0 2px var(--glow-2) inset, var(--inner); }
         .seg-switch-3[data-side="center"] { box-shadow: var(--shadow), 0 0 0 2px var(--glow-2) inset, var(--inner); }
         .seg-switch-3[data-side="right"] { box-shadow: var(--shadow), 0 0 0 2px var(--glow-3) inset, var(--inner); }
+        .seg-switch-4[data-side="center"] { box-shadow: var(--shadow), 0 0 0 2px var(--glow-2) inset, var(--inner); }
+        .seg-switch-4[data-side="right"] { box-shadow: var(--shadow), 0 0 0 2px var(--glow-3) inset, var(--inner); }
+        .seg-switch-4[data-side="far-right"] { box-shadow: var(--shadow), 0 0 0 2px var(--glow-4) inset, var(--inner); }
+
+        @keyframes ollama_spin {
+            to { transform: rotate(360deg); }
+        }
 
         /* Animation for section transitions */
-        #openai_section, #gemini_section, #claude_section {
+        #openai_section, #gemini_section, #claude_section, #ollama_section {
             transition: all 0.3s ease;
         }
 
-        #openai_section.fade-out, #gemini_section.fade-out {
+        #openai_section.fade-out, #gemini_section.fade-out, #ollama_section.fade-out {
             opacity: 0;
             transform: translateY(-10px);
         }
 
-        #openai_section.fade-in, #gemini_section.fade-in {
+        #openai_section.fade-in, #gemini_section.fade-in, #ollama_section.fade-in {
             opacity: 1;
             transform: translateY(0);
         }
@@ -867,15 +915,16 @@
         <form id="envConfigForm">
 
       
-         <!-- AI Provider: 3-segment pill (old design extended) -->
+         <!-- AI Provider: 4-segment pill -->
          <div class="llm-provider-container">
             <label for="modelSwitch" style="display: block; margin-bottom: 8px; font-weight: 600;">AI Provider</label>
-            <button type="button" id="modelSwitch" class="seg-switch seg-switch-3" aria-label="Select AI provider: OpenAI, Gemini, or Claude" data-side="left">
+            <div id="modelSwitch" class="seg-switch seg-switch-4" role="group" aria-label="Select AI provider" tabindex="0" data-side="left">
                 <div class="seg-slider" aria-hidden="true"></div>
-                <div class="seg-label seg-label--left"><i class="fas fa-robot"></i><span>OpenAI</span></div>
-                <div class="seg-label seg-label--center"><i class="fas fa-brain"></i><span>Gemini</span></div>
-                <div class="seg-label seg-label--right"><i class="fas fa-leaf"></i><span>Claude</span></div>
-            </button>
+                <div class="seg-label seg-label--left"   data-provider="OpenAI" onclick="setLLMProvider('OpenAI')"><i class="fas fa-robot"></i><span>OpenAI</span></div>
+                <div class="seg-label seg-label--center" data-provider="Gemini" onclick="setLLMProvider('Gemini')"><i class="fas fa-brain"></i><span>Gemini</span></div>
+                <div class="seg-label seg-label--right"  data-provider="Claude" onclick="setLLMProvider('Claude')"><i class="fas fa-leaf"></i><span>Claude</span></div>
+                <div class="seg-label seg-label--far-right" data-provider="Ollama" onclick="setLLMProvider('Ollama')"><i class="fas fa-server"></i><span>Ollama</span></div>
+            </div>
             <input type="hidden" id="llm_provider" value="OpenAI">
         </div>
 
@@ -903,12 +952,18 @@
                         }
                     });
                 </script>
-                <div class="password-input-wrapper">
-                    <input type="password" id="OPENAI_API_KEY" placeholder="Required - Please enter your OpenAI API key">
-                    <button type="button" class="visibility-toggle" onclick="toggleVisibilityById('OPENAI_API_KEY', this)" aria-label="Show API key">
-                        <i class="fas fa-eye"></i>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <div class="password-input-wrapper" style="flex:1;">
+                        <input type="password" id="OPENAI_API_KEY" placeholder="Required - Please enter your OpenAI API key">
+                        <button type="button" class="visibility-toggle" onclick="toggleVisibilityById('OPENAI_API_KEY', this)" aria-label="Show API key">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <button type="button" id="test_btn_openai" class="api-test-btn" onclick="testApiKey('openai')">
+                        <i class="fas fa-plug"></i> Test
                     </button>
                 </div>
+                <div id="openai_test_result" class="api-test-result" style="display:none;"></div>
             </div>
 
             <!-- Gemini API Key Section -->
@@ -935,42 +990,320 @@
                         }
                     });
                 </script>
-                <div class="password-input-wrapper">
-                    <input type="password" id="GEMINI_API_KEY" placeholder="Required - Please enter your Gemini API key">
-                    <button type="button" class="visibility-toggle" onclick="toggleVisibilityById('GEMINI_API_KEY', this)" aria-label="Show API key">
-                        <i class="fas fa-eye"></i>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <div class="password-input-wrapper" style="flex:1;">
+                        <input type="password" id="GEMINI_API_KEY" placeholder="Required - Please enter your Gemini API key">
+                        <button type="button" class="visibility-toggle" onclick="toggleVisibilityById('GEMINI_API_KEY', this)" aria-label="Show API key">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <button type="button" id="test_btn_gemini" class="api-test-btn" onclick="testApiKey('gemini')">
+                        <i class="fas fa-plug"></i> Test
                     </button>
                 </div>
+                <div id="gemini_test_result" class="api-test-result" style="display:none;"></div>
             </div>
 
             <!-- Claude API Key Section -->
             <div id="claude_section" style="display: none;">
                 <label for="ANTHROPIC_API_KEY">Claude (Anthropic) API Key <span style="color: #dc3545; font-size: 0.9em; font-weight: normal;">(Required)</span></label>
                 <a href="https://console.anthropic.com/settings/keys" target="_blank" style="margin-left: 10px; font-family: Arial, sans-serif; color: blue; text-decoration: underline;">Get API Key</a>
-                <span style="margin-left: 10px; font-family: Arial, sans-serif; color: gray; position: relative;">
-                    <i class="fas fa-info-circle" style="cursor: pointer;"></i>
-                    <span style="visibility: hidden; width: 250px; background-color: black; color: #fff; text-align: center; border-radius: 6px; padding: 5px 0; position: absolute; z-index: 1; bottom: 125%; left: 50%; margin-left: -125px; opacity: 0; transition: opacity 0.3s;">
-                        Get your Anthropic API key from the Anthropic Console. This is required for using Claude models.
-                    </span>
-                </span>
-                <script>
-                    document.querySelectorAll('#claude_section .fa-info-circle').forEach(function(icon) {
-                        icon.addEventListener('mouseover', function() {
-                            this.nextElementSibling.style.visibility = 'visible';
-                            this.nextElementSibling.style.opacity = '1';
-                        });
-                        icon.addEventListener('mouseout', function() {
-                            this.nextElementSibling.style.visibility = 'hidden';
-                            this.nextElementSibling.style.opacity = '0';
-                        });
-                    });
-                </script>
-                <div class="password-input-wrapper">
-                    <input type="password" id="ANTHROPIC_API_KEY" placeholder="Required - Please enter your Anthropic API key">
-                    <button type="button" class="visibility-toggle" onclick="toggleVisibilityById('ANTHROPIC_API_KEY', this)" aria-label="Show API key">
-                        <i class="fas fa-eye"></i>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <div class="password-input-wrapper" style="flex:1;">
+                        <input type="password" id="ANTHROPIC_API_KEY" placeholder="Required - Please enter your Anthropic API key">
+                        <button type="button" class="visibility-toggle" onclick="toggleVisibilityById('ANTHROPIC_API_KEY', this)" aria-label="Show API key">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <button type="button" id="test_btn_claude" class="api-test-btn" onclick="testApiKey('claude')">
+                        <i class="fas fa-plug"></i> Test
                     </button>
                 </div>
+                <div id="claude_test_result" class="api-test-result" style="display:none;"></div>
+            </div>
+
+            <!-- Ollama Local LLM Section -->
+            <div id="ollama_section" style="display: none;">
+
+                <!-- Live status card — populated by checkOllamaStatus() -->
+                <div id="ollama_status_card" style="border: 1px solid rgba(0,0,0,0.1); border-radius: 10px; padding: 13px 15px; margin-bottom: 14px; background: rgba(0,0,0,0.025);">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                        <span style="font-weight:600; font-size:0.92em; color:var(--text-color,#333);">System Status</span>
+                        <span id="ollama_status_checking" style="font-size:0.8em; color:#7c3aed; display:none;">
+                            <span style="display:inline-block;width:10px;height:10px;border:2px solid #7c3aed;border-top-color:transparent;border-radius:50%;animation:ollama_spin 0.7s linear infinite;vertical-align:middle;margin-right:3px;"></span>checking…
+                        </span>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:7px;">
+                        <div style="display:flex; align-items:center; gap:8px; font-size:0.88em;">
+                            <span id="ollama_ind_installed" class="ollama-status-dot ollama-dot-pending">●</span>
+                            <span>Ollama installed</span>
+                            <span id="ollama_ind_installed_note" style="margin-left:auto; font-size:0.85em; color:#888;"></span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px; font-size:0.88em;">
+                            <span id="ollama_ind_running" class="ollama-status-dot ollama-dot-pending">●</span>
+                            <span>Server running</span>
+                            <span id="ollama_ind_running_note" style="margin-left:auto; font-size:0.85em; color:#888;"></span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px; font-size:0.88em;">
+                            <span id="ollama_ind_model" class="ollama-status-dot ollama-dot-pending">●</span>
+                            <span id="ollama_ind_model_label">Model available</span>
+                            <span id="ollama_ind_model_note" style="margin-left:auto; font-size:0.85em; color:#888;"></span>
+                        </div>
+                    </div>
+                    <!-- Test connection button row -->
+                    <div style="display:flex; align-items:center; justify-content:flex-end; gap:10px; margin-top:10px; padding-top:10px; border-top:1px solid rgba(0,0,0,0.07);">
+                        <div id="ollama_test_result" class="api-test-result" style="display:none; flex:1;"></div>
+                        <button type="button" id="test_btn_ollama" class="api-test-btn" onclick="testApiKey('ollama')">
+                            <i class="fas fa-plug"></i> Test Connection
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Dynamic info banner -->
+                <div class="ollama-info-banner" style="background: rgba(124, 58, 237, 0.08); border: 1px solid rgba(124, 58, 237, 0.25); border-radius: 10px; padding: 13px 15px; margin-bottom: 16px;">
+                    <p id="ollama_status_banner_text" style="margin: 0; font-size: 0.88em; color: var(--text-color, #444);">
+                        <i class="fas fa-server" style="color: #7c3aed; margin-right: 6px;"></i>Select a model and click <strong>Update Environment Configuration</strong> — the system will handle installation, download, and startup automatically.
+                    </p>
+                </div>
+
+                <!-- Model selector -->
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                    <label for="OLLAMA_MODEL_SELECT" style="font-weight:600; flex:1; margin:0;">Model</label>
+                    <button type="button" onclick="openOllamaGuide()"
+                        title="Model comparison guide"
+                        style="display:inline-flex; align-items:center; gap:5px; background:rgba(124,58,237,0.1); border:1px solid rgba(124,58,237,0.3); border-radius:20px; padding:4px 11px; cursor:pointer; font-size:0.8em; color:#7c3aed; font-weight:600; transition:background 0.15s;"
+                        onmouseover="this.style.background='rgba(124,58,237,0.18)'" onmouseout="this.style.background='rgba(124,58,237,0.1)'">
+                        <i class="fas fa-circle-question"></i> Model Guide
+                    </button>
+                </div>
+                <select id="OLLAMA_MODEL_SELECT" style="width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(124,58,237,0.3); background: var(--input-bg, #fff); color: var(--text-color, #333); font-size: 0.95em; margin-bottom: 8px;" onchange="syncOllamaModelInput(this.value)">
+                    <optgroup label="🎯 Recommended — Best for most users">
+                        <option value="llama3.2">llama3.2 — 3.2B · ~2 GB · Great balance of speed &amp; quality</option>
+                        <option value="llama3.1:8b">llama3.1:8b — 8B · ~4.7 GB · Better reasoning</option>
+                    </optgroup>
+                    <optgroup label="⚡ Small / Low-Resource — Minimal RAM">
+                        <option value="llama3.2:1b">llama3.2:1b — 1B · ~1.3 GB · Fastest, lowest RAM</option>
+                        <option value="qwen3:1.7b">qwen3:1.7b — 1.7B · ~1.1 GB · Qwen small</option>
+                        <option value="deepseek-r1:1.5b">deepseek-r1:1.5b — 1.5B · ~1.1 GB · Reasoning, low-resource</option>
+                        <option value="phi3:mini">phi3:mini — 3.8B · ~2.3 GB · Microsoft Phi-3</option>
+                        <option value="gemma3:4b">gemma3:4b — 4B · ~2.5 GB · Google Gemma 3</option>
+                    </optgroup>
+                    <optgroup label="🏆 High Quality — 8 GB+ RAM recommended">
+                        <option value="phi4">phi4 — 14B · ~8.9 GB · Microsoft Phi-4, top-tier</option>
+                        <option value="qwen3:8b">qwen3:8b — 8B · ~5 GB · Best reasoning at 8B size</option>
+                        <option value="gemma2:9b">gemma2:9b — 9B · ~5.4 GB · Google Gemma 2</option>
+                        <option value="gemma3:12b">gemma3:12b — 12B · ~7.7 GB · Google Gemma 3</option>
+                        <option value="mistral">mistral — 7B · ~4.1 GB · Mistral 7B v0.3</option>
+                        <option value="mistral-nemo:12b">mistral-nemo:12b — 12B · ~7 GB · Extended context</option>
+                    </optgroup>
+                    <optgroup label="🧠 Reasoning / Deep Think">
+                        <option value="deepseek-r1:7b">deepseek-r1:7b — 7B · ~4.7 GB · Chain-of-thought reasoning</option>
+                        <option value="deepseek-r1:14b">deepseek-r1:14b — 14B · ~8.9 GB · Stronger reasoning</option>
+                    </optgroup>
+                    <optgroup label="💻 Code">
+                        <option value="codellama:7b">codellama:7b — 7B · ~3.8 GB · Meta Code Llama</option>
+                        <option value="qwen2.5-coder:7b">qwen2.5-coder:7b — 7B · ~4.4 GB · Best coding model</option>
+                    </optgroup>
+                    <optgroup label="☁️ Cloud / Hosted via Ollama">
+                        <option value="kimi-k2.5:cloud">kimi-k2.5:cloud — Cloud · No local storage · Moonshot Kimi K2.5</option>
+                    </optgroup>
+                    <optgroup id="omg-installed-optgroup" label="✅ Installed on your machine" style="display:none"></optgroup>
+                    <optgroup label="✏️ Custom">
+                        <option value="custom">Custom model name — type below</option>
+                    </optgroup>
+                </select>
+                <!-- Custom model text input — hidden until user picks "Custom model name" in dropdown.
+                     Its value is always kept in sync by syncOllamaModelInput(), so JS elsewhere
+                     (updateEnvConfig, checkOllamaStatus) can always read it via #OLLAMA_MODEL. -->
+                <div id="ollama_custom_row" style="display:none; margin-bottom:16px;">
+                    <input type="text" id="OLLAMA_MODEL" placeholder="Type exact Ollama model name, e.g. llama3.2:latest"
+                           style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid rgba(124,58,237,0.4); background: var(--input-bg, #fff); color: var(--text-color, #333); font-size: 0.95em; box-sizing: border-box;"
+                           oninput="syncOllamaModelSelect(this.value)">
+                    <p style="font-size: 0.82em; color: var(--text-color, #777); margin-top: 5px; margin-bottom: 0;">
+                        Must match the exact name in the <a href="https://ollama.com/library" target="_blank" style="color:#7c3aed;">Ollama library</a>. Examples: <code style="background:rgba(0,0,0,0.07);padding:1px 4px;border-radius:3px;">llama3.2</code>, <code style="background:rgba(0,0,0,0.07);padding:1px 4px;border-radius:3px;">mistral:7b-instruct</code>.
+                    </p>
+                </div>
+
+                <!-- Base URL -->
+                <label for="OLLAMA_BASE_URL" style="font-weight: 600; display: block; margin-bottom: 6px;">Ollama Base URL <span style="font-weight: normal; font-size: 0.88em; color: #888;">(default: http://localhost:11434)</span></label>
+                <input type="text" id="OLLAMA_BASE_URL" placeholder="http://localhost:11434" value="http://localhost:11434"
+                       style="width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid rgba(124,58,237,0.3); background: var(--input-bg, #fff); color: var(--text-color, #333); font-size: 0.95em; box-sizing: border-box;">
+                <p style="font-size: 0.82em; color: var(--text-color, #777); margin-top: 5px; margin-bottom: 20px;">
+                    Change only if Ollama is running on a remote host or non-default port.
+                </p>
+
+                <!-- Setup progress panel (shown during/after setup) -->
+                <div id="ollama_setup_panel" style="display: none; border: 1px solid rgba(124,58,237,0.25); border-radius: 10px; overflow: hidden; margin-bottom: 16px;">
+                    <!-- Header -->
+                    <div style="background: rgba(124,58,237,0.08); padding: 12px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(124,58,237,0.12);">
+                        <span id="ollama_panel_spinner" style="display:inline-block; width:16px; height:16px; border:2px solid #7c3aed; border-top-color:transparent; border-radius:50%; animation:ollama_spin 0.7s linear infinite;"></span>
+                        <span id="ollama_panel_title" style="font-weight:600; color:#7c3aed; font-size:0.95em;">Setting up Ollama...</span>
+                    </div>
+                    <!-- Steps -->
+                    <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;">
+                        <div id="ollama_step_1" class="ollama-step-row">
+                            <span id="ollama_step_1_icon" class="ollama-step-icon ollama-step-pending">○</span>
+                            <span id="ollama_step_1_label">Check &amp; install Ollama</span>
+                        </div>
+                        <div id="ollama_step_2" class="ollama-step-row">
+                            <span id="ollama_step_2_icon" class="ollama-step-icon ollama-step-pending">○</span>
+                            <span id="ollama_step_2_label">Start Ollama server</span>
+                        </div>
+                        <div id="ollama_step_3" class="ollama-step-row">
+                            <span id="ollama_step_3_icon" class="ollama-step-icon ollama-step-pending">○</span>
+                            <span id="ollama_step_3_label">Pull model</span>
+                        </div>
+                        <div id="ollama_step_4" class="ollama-step-row">
+                            <span id="ollama_step_4_icon" class="ollama-step-icon ollama-step-pending">○</span>
+                            <span id="ollama_step_4_label">Verify setup</span>
+                        </div>
+                    </div>
+                    <!-- Log output -->
+                    <div id="ollama_setup_log" style="margin: 0 12px 12px 12px; background: rgba(0,0,0,0.05); border-radius: 6px; padding: 10px; max-height: 180px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 0.78em; color: #444; line-height: 1.5; white-space: pre-wrap;"></div>
+                </div>
+
+                <script>
+                    function syncOllamaModelInput(selectVal) {
+                        var inp = document.getElementById('OLLAMA_MODEL');
+                        var customRow = document.getElementById('ollama_custom_row');
+                        if (selectVal === 'custom') {
+                            if (customRow) customRow.style.display = 'block';
+                            if (inp) { inp.value = ''; inp.focus(); }
+                        } else {
+                            if (customRow) customRow.style.display = 'none';
+                            // Keep value in sync even while hidden so updateEnvConfig reads correctly
+                            if (inp) inp.value = selectVal;
+                        }
+                        if (typeof checkOllamaStatus === 'function') setTimeout(checkOllamaStatus, 80);
+                    }
+                    function syncOllamaModelSelect(inputVal) {
+                        var sel = document.getElementById('OLLAMA_MODEL_SELECT');
+                        var customRow = document.getElementById('ollama_custom_row');
+                        if (!sel) return;
+                        var found = false;
+                        for (var i = 0; i < sel.options.length; i++) {
+                            if (sel.options[i].value === inputVal) { sel.selectedIndex = i; found = true; break; }
+                        }
+                        if (!found) {
+                            sel.value = 'custom';
+                            if (customRow) customRow.style.display = 'block';
+                        }
+                        if (typeof checkOllamaStatus === 'function') setTimeout(checkOllamaStatus, 80);
+                    }
+                    function selectOllamaModelFromGuide(modelValue) {
+                        var sel = document.getElementById('OLLAMA_MODEL_SELECT');
+                        if (sel) {
+                            var found = false;
+                            for (var i = 0; i < sel.options.length; i++) {
+                                if (sel.options[i].value === modelValue) { sel.selectedIndex = i; found = true; break; }
+                            }
+                            if (!found) { sel.value = 'custom'; }
+                        }
+                        syncOllamaModelInput(modelValue);
+                        document.getElementById('ollama_model_guide_modal').style.display = 'none';
+                    }
+
+                    async function openOllamaGuide() {
+                        var modal = document.getElementById('ollama_model_guide_modal');
+                        modal.style.display = 'flex';
+
+                        // Remove any rows/chips injected by a previous call
+                        document.querySelectorAll('.omg-dynamic-installed').forEach(function(el) { el.remove(); });
+                        document.querySelectorAll('.omg-chip-installed-dynamic').forEach(function(el) { el.remove(); });
+
+                        // Clear previously injected dropdown options
+                        var instOptgroup = document.getElementById('omg-installed-optgroup');
+                        if (instOptgroup) { instOptgroup.innerHTML = ''; instOptgroup.style.display = 'none'; }
+
+                        try {
+                            var resp = await fetch(baseURL + '/ollama_status');
+                            if (!resp.ok) return;
+                            var data = await resp.json();
+                            var installedModels = data.installed_models || [];
+                            if (!installedModels.length) return;
+
+                            // Build map: modelName → static table row (using onclick to extract model value)
+                            var knownMap = {};
+                            document.querySelectorAll('#ollama_guide_tbody tr.omg-row').forEach(function(tr) {
+                                var oc = tr.getAttribute('onclick') || '';
+                                var m = oc.match(/selectOllamaModelFromGuide\('([^']+)'\)/);
+                                if (m) knownMap[m[1]] = tr;
+                            });
+
+                            // Also build set of values already in the dropdown
+                            var dropdownValues = {};
+                            var sel = document.getElementById('OLLAMA_MODEL_SELECT');
+                            if (sel) {
+                                for (var i = 0; i < sel.options.length; i++) {
+                                    dropdownValues[sel.options[i].value] = true;
+                                }
+                            }
+
+                            var unknownModels = [];
+                            installedModels.forEach(function(modelName) {
+                                if (knownMap[modelName]) {
+                                    // Mark as installed in the table
+                                    var nameCell = knownMap[modelName].querySelector('.omg-td-name');
+                                    if (nameCell && !nameCell.querySelector('.omg-chip-installed-dynamic')) {
+                                        var chip = document.createElement('span');
+                                        chip.className = 'omg-chip omg-chip-installed omg-chip-installed-dynamic';
+                                        chip.textContent = 'Installed';
+                                        nameCell.appendChild(chip);
+                                    }
+                                } else {
+                                    unknownModels.push(modelName);
+                                }
+                            });
+
+                            // Add unknown models to table as a top section
+                            if (unknownModels.length > 0) {
+                                var tbody = document.getElementById('ollama_guide_tbody');
+                                var insertRef = tbody.firstChild;
+
+                                var hdrRow = document.createElement('tr');
+                                hdrRow.className = 'omg-section-hdr omg-dynamic-installed';
+                                hdrRow.innerHTML = '<td colspan="8">✅ Installed on your machine — ready to use right now</td>';
+                                tbody.insertBefore(hdrRow, insertRef);
+                                var afterEl = hdrRow;
+
+                                unknownModels.forEach(function(modelName) {
+                                    var safeName = modelName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                                    var tr = document.createElement('tr');
+                                    tr.className = 'omg-row omg-dynamic-installed';
+                                    tr.onclick = function() { selectOllamaModelFromGuide(modelName); };
+                                    tr.innerHTML =
+                                        '<td class="omg-td-name">' + modelName +
+                                        ' <span class="omg-chip omg-chip-installed">Installed</span></td>' +
+                                        '<td class="omg-td-num">—</td><td class="omg-td-num">—</td><td class="omg-td-num">—</td>' +
+                                        '<td class="omg-td-meta">—</td><td class="omg-td-meta">—</td>' +
+                                        '<td class="omg-td-desc">Already on your machine — no download needed</td>' +
+                                        '<td class="omg-td-btn"><button type="button" class="omg-select-btn" ' +
+                                        'onclick="event.stopPropagation();selectOllamaModelFromGuide(\'' + safeName + '\')">Use</button></td>';
+                                    afterEl.insertAdjacentElement('afterend', tr);
+                                    afterEl = tr;
+                                });
+                            }
+
+                            // Add unknown models to dropdown too
+                            if (instOptgroup && unknownModels.length > 0) {
+                                unknownModels.forEach(function(modelName) {
+                                    if (!dropdownValues[modelName]) {
+                                        var opt = document.createElement('option');
+                                        opt.value = modelName;
+                                        opt.textContent = modelName + ' — already installed';
+                                        instOptgroup.appendChild(opt);
+                                    }
+                                });
+                                if (instOptgroup.options && instOptgroup.options.length > 0 || instOptgroup.childElementCount > 0) {
+                                    instOptgroup.style.display = '';
+                                }
+                            }
+
+                        } catch (e) {
+                            // silently ignore — just show the static table
+                        }
+                    }
+                </script>
             </div>
 
             <!-- Custom API Keys Section -->
@@ -1862,5 +2195,378 @@
             // Just ensure the diagram is properly styled - no interactive functionality needed
         }
     </script>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         Ollama Model Guide Modal — position:fixed, independent of
+         ollama_section visibility.
+    ═══════════════════════════════════════════════════════════════════ -->
+    <div id="ollama_model_guide_modal"
+         style="display:none; position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.42); align-items:flex-start; justify-content:center; overflow-y:auto; padding:36px 20px 60px; box-sizing:border-box;"
+         onclick="if(event.target===this)this.style.display='none'">
+        <div style="width:100%; max-width:1060px; margin:0 auto; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 12px 40px rgba(0,0,0,0.16); font-family:'Nunito',sans-serif;">
+
+            <!-- Header -->
+            <div style="padding:20px 24px 16px; display:flex; align-items:center; justify-content:space-between; gap:16px; border-bottom:1px solid #ececec; flex-wrap:wrap;">
+                <div>
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:3px;">
+                        <span style="font-size:1.2em; line-height:1;">🦙</span>
+                        <h3 style="margin:0; font-size:1.1em; font-weight:800; color:#111; letter-spacing:-0.2px;">Ollama Model Guide</h3>
+                    </div>
+                    <p style="margin:0; font-size:0.8em; color:#888; line-height:1.5;">Run models 100% locally — no API key, no bill. Click any row or <strong style="color:#555;">Use</strong> to select.</p>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+                    <!-- Basic / Advanced toggle -->
+                    <div style="display:flex; background:#ede9f5; border-radius:8px; padding:3px; gap:2px;">
+                        <button id="omg-toggle-basic" type="button" onclick="omgSetMode('basic')" class="omg-toggle-btn omg-toggle-active">Basic</button>
+                        <button id="omg-toggle-adv"   type="button" onclick="omgSetMode('adv')"   class="omg-toggle-btn">Advanced</button>
+                    </div>
+                    <button type="button" onclick="document.getElementById('ollama_model_guide_modal').style.display='none'"
+                        style="background:none; border:1.5px solid #e2e2e2; border-radius:8px; width:32px; height:32px; cursor:pointer; color:#999; font-size:1em; line-height:1; padding:0; flex-shrink:0; transition:all 0.15s; display:flex; align-items:center; justify-content:center;"
+                        onmouseover="this.style.borderColor='#aaa';this.style.color='#333';this.style.background='#f5f5f5'" onmouseout="this.style.borderColor='#e2e2e2';this.style.color='#999';this.style.background='none'">✕</button>
+                </div>
+            </div>
+
+            <!-- Table wrapper — mode class drives column visibility -->
+            <div id="omg-table-wrap" class="omg-mode-basic" style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.88em; font-family:'Nunito',sans-serif;">
+                    <thead>
+                        <tr style="text-align:left; font-size:0.73em; color:#b0b0b0; text-transform:uppercase; letter-spacing:0.08em; font-weight:700; background:#f9f9f9; border-bottom:1.5px solid #ececec;">
+                            <th style="padding:11px 22px; min-width:190px;">Model</th>
+                            <th class="omg-th-basic" style="padding:11px 14px; min-width:240px;">Works best on</th>
+                            <th class="omg-th-adv" style="padding:11px 14px; white-space:nowrap;">Params</th>
+                            <th class="omg-th-adv" style="padding:11px 14px; white-space:nowrap;">Disk</th>
+                            <th class="omg-th-adv" style="padding:11px 14px; white-space:nowrap;">Min RAM</th>
+                            <th class="omg-th-adv" style="padding:11px 14px; white-space:nowrap;">Speed</th>
+                            <th class="omg-th-adv" style="padding:11px 14px; white-space:nowrap;">Quality</th>
+                            <th style="padding:11px 22px;">Best for</th>
+                            <th style="padding:11px 16px; min-width:64px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="ollama_guide_tbody">
+
+                        <!-- ── Recommended ── -->
+                        <tr class="omg-section-hdr"><td colspan="9">⭐ Recommended — best for most users</td></tr>
+                        <tr class="omg-row" onclick="selectOllamaModelFromGuide('llama3.2')">
+                            <td class="omg-td-name">llama3.2 <span class="omg-chip">Default</span></td>
+                            <td class="omg-td-basic omg-td-compat">MacBook M1 or later &nbsp;·&nbsp; Windows / Linux PC with 8 GB RAM</td>
+                            <td class="omg-td-adv omg-td-num">3.2B</td><td class="omg-td-adv omg-td-num">~2 GB</td><td class="omg-td-adv omg-td-num">4 GB</td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-fast">Fast</span></td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-good">Good</span></td>
+                            <td class="omg-td-desc">General use, everyday tasks</td>
+                            <td class="omg-td-btn"><button type="button" onclick="event.stopPropagation();selectOllamaModelFromGuide('llama3.2')" class="omg-select-btn">Use</button></td>
+                        </tr>
+                        <tr class="omg-row" onclick="selectOllamaModelFromGuide('llama3.1:8b')">
+                            <td class="omg-td-name">llama3.1:8b</td>
+                            <td class="omg-td-basic omg-td-compat">MacBook M1 Pro / M2 or later &nbsp;·&nbsp; PC with 16 GB RAM</td>
+                            <td class="omg-td-adv omg-td-num">8B</td><td class="omg-td-adv omg-td-num">~4.7 GB</td><td class="omg-td-adv omg-td-num">8 GB</td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-med">Medium</span></td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-great">Great</span></td>
+                            <td class="omg-td-desc">Better reasoning, long context (128K)</td>
+                            <td class="omg-td-btn"><button type="button" onclick="event.stopPropagation();selectOllamaModelFromGuide('llama3.1:8b')" class="omg-select-btn">Use</button></td>
+                        </tr>
+
+                        <!-- ── Small ── -->
+                        <tr class="omg-section-hdr"><td colspan="9">⚡ Small — runs on 3–4 GB RAM</td></tr>
+                        <tr class="omg-row" onclick="selectOllamaModelFromGuide('llama3.2:1b')">
+                            <td class="omg-td-name">llama3.2:1b</td>
+                            <td class="omg-td-basic omg-td-compat">Any MacBook M1+ &nbsp;·&nbsp; Any PC with 4 GB RAM (Intel / AMD / ARM)</td>
+                            <td class="omg-td-adv omg-td-num">1B</td><td class="omg-td-adv omg-td-num">~1.3 GB</td><td class="omg-td-adv omg-td-num">3 GB</td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-fast">Fastest</span></td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill">OK</span></td>
+                            <td class="omg-td-desc">Fastest, very low RAM devices</td>
+                            <td class="omg-td-btn"><button type="button" onclick="event.stopPropagation();selectOllamaModelFromGuide('llama3.2:1b')" class="omg-select-btn">Use</button></td>
+                        </tr>
+                        <tr class="omg-row" onclick="selectOllamaModelFromGuide('qwen3:1.7b')">
+                            <td class="omg-td-name">qwen3:1.7b</td>
+                            <td class="omg-td-basic omg-td-compat">Any MacBook M1+ &nbsp;·&nbsp; Any PC with 4 GB RAM (Intel / AMD / ARM)</td>
+                            <td class="omg-td-adv omg-td-num">1.7B</td><td class="omg-td-adv omg-td-num">~1.1 GB</td><td class="omg-td-adv omg-td-num">3 GB</td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-fast">Fastest</span></td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill">OK</span></td>
+                            <td class="omg-td-desc">Alibaba Qwen, very compact</td>
+                            <td class="omg-td-btn"><button type="button" onclick="event.stopPropagation();selectOllamaModelFromGuide('qwen3:1.7b')" class="omg-select-btn">Use</button></td>
+                        </tr>
+                        <tr class="omg-row" onclick="selectOllamaModelFromGuide('deepseek-r1:1.5b')">
+                            <td class="omg-td-name">deepseek-r1:1.5b</td>
+                            <td class="omg-td-basic omg-td-compat">Any MacBook M1+ &nbsp;·&nbsp; Any PC with 4 GB RAM (Intel / AMD / ARM)</td>
+                            <td class="omg-td-adv omg-td-num">1.5B</td><td class="omg-td-adv omg-td-num">~1.1 GB</td><td class="omg-td-adv omg-td-num">3 GB</td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-fast">Fastest</span></td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill">OK</span></td>
+                            <td class="omg-td-desc">Reasoning on low-end hardware</td>
+                            <td class="omg-td-btn"><button type="button" onclick="event.stopPropagation();selectOllamaModelFromGuide('deepseek-r1:1.5b')" class="omg-select-btn">Use</button></td>
+                        </tr>
+                        <tr class="omg-row" onclick="selectOllamaModelFromGuide('phi3:mini')">
+                            <td class="omg-td-name">phi3:mini</td>
+                            <td class="omg-td-basic omg-td-compat">MacBook M1 or later &nbsp;·&nbsp; Windows / Linux PC with 8 GB RAM</td>
+                            <td class="omg-td-adv omg-td-num">3.8B</td><td class="omg-td-adv omg-td-num">~2.3 GB</td><td class="omg-td-adv omg-td-num">4 GB</td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-fast">Fast</span></td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-good">Good</span></td>
+                            <td class="omg-td-desc">Microsoft Phi-3, punches above weight</td>
+                            <td class="omg-td-btn"><button type="button" onclick="event.stopPropagation();selectOllamaModelFromGuide('phi3:mini')" class="omg-select-btn">Use</button></td>
+                        </tr>
+                        <tr class="omg-row" onclick="selectOllamaModelFromGuide('gemma3:4b')">
+                            <td class="omg-td-name">gemma3:4b</td>
+                            <td class="omg-td-basic omg-td-compat">MacBook M1 or later &nbsp;·&nbsp; Windows / Linux PC with 8 GB RAM</td>
+                            <td class="omg-td-adv omg-td-num">4B</td><td class="omg-td-adv omg-td-num">~2.5 GB</td><td class="omg-td-adv omg-td-num">4 GB</td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-fast">Fast</span></td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-good">Good</span></td>
+                            <td class="omg-td-desc">Google Gemma 3 compact</td>
+                            <td class="omg-td-btn"><button type="button" onclick="event.stopPropagation();selectOllamaModelFromGuide('gemma3:4b')" class="omg-select-btn">Use</button></td>
+                        </tr>
+
+                        <!-- ── High Quality ── -->
+                        <tr class="omg-section-hdr"><td colspan="9">🏆 High Quality — 8–16 GB RAM recommended</td></tr>
+                        <tr class="omg-row" onclick="selectOllamaModelFromGuide('qwen3:8b')">
+                            <td class="omg-td-name">qwen3:8b</td>
+                            <td class="omg-td-basic omg-td-compat">MacBook M1 Pro / M2 or later &nbsp;·&nbsp; PC with 16 GB RAM</td>
+                            <td class="omg-td-adv omg-td-num">8B</td><td class="omg-td-adv omg-td-num">~5 GB</td><td class="omg-td-adv omg-td-num">8 GB</td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-med">Medium</span></td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-great">Great</span></td>
+                            <td class="omg-td-desc">Best reasoning at 8B class</td>
+                            <td class="omg-td-btn"><button type="button" onclick="event.stopPropagation();selectOllamaModelFromGuide('qwen3:8b')" class="omg-select-btn">Use</button></td>
+                        </tr>
+                        <tr class="omg-row" onclick="selectOllamaModelFromGuide('mistral')">
+                            <td class="omg-td-name">mistral</td>
+                            <td class="omg-td-basic omg-td-compat">MacBook M1 Pro / M2 or later &nbsp;·&nbsp; PC with 16 GB RAM</td>
+                            <td class="omg-td-adv omg-td-num">7B</td><td class="omg-td-adv omg-td-num">~4.1 GB</td><td class="omg-td-adv omg-td-num">8 GB</td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-med">Medium</span></td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-good">Good</span></td>
+                            <td class="omg-td-desc">Versatile general purpose</td>
+                            <td class="omg-td-btn"><button type="button" onclick="event.stopPropagation();selectOllamaModelFromGuide('mistral')" class="omg-select-btn">Use</button></td>
+                        </tr>
+                        <tr class="omg-row" onclick="selectOllamaModelFromGuide('gemma2:9b')">
+                            <td class="omg-td-name">gemma2:9b</td>
+                            <td class="omg-td-basic omg-td-compat">MacBook M1 Pro / M2 or later &nbsp;·&nbsp; PC with 16 GB RAM</td>
+                            <td class="omg-td-adv omg-td-num">9B</td><td class="omg-td-adv omg-td-num">~5.4 GB</td><td class="omg-td-adv omg-td-num">8 GB</td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-med">Medium</span></td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-good">Good</span></td>
+                            <td class="omg-td-desc">Google Gemma 2, solid quality</td>
+                            <td class="omg-td-btn"><button type="button" onclick="event.stopPropagation();selectOllamaModelFromGuide('gemma2:9b')" class="omg-select-btn">Use</button></td>
+                        </tr>
+                        <tr class="omg-row" onclick="selectOllamaModelFromGuide('gemma3:12b')">
+                            <td class="omg-td-name">gemma3:12b</td>
+                            <td class="omg-td-basic omg-td-compat">MacBook M2 Pro / M3 or later &nbsp;·&nbsp; High-spec PC with 32 GB RAM</td>
+                            <td class="omg-td-adv omg-td-num">12B</td><td class="omg-td-adv omg-td-num">~7.7 GB</td><td class="omg-td-adv omg-td-num">16 GB</td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-slow">Slow</span></td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-great">Great</span></td>
+                            <td class="omg-td-desc">Google Gemma 3 flagship</td>
+                            <td class="omg-td-btn"><button type="button" onclick="event.stopPropagation();selectOllamaModelFromGuide('gemma3:12b')" class="omg-select-btn">Use</button></td>
+                        </tr>
+                        <tr class="omg-row" onclick="selectOllamaModelFromGuide('mistral-nemo:12b')">
+                            <td class="omg-td-name">mistral-nemo:12b</td>
+                            <td class="omg-td-basic omg-td-compat">MacBook M2 Pro / M3 or later &nbsp;·&nbsp; High-spec PC with 32 GB RAM</td>
+                            <td class="omg-td-adv omg-td-num">12B</td><td class="omg-td-adv omg-td-num">~7 GB</td><td class="omg-td-adv omg-td-num">16 GB</td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-slow">Slow</span></td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-good">Good</span></td>
+                            <td class="omg-td-desc">Extended context window (128K)</td>
+                            <td class="omg-td-btn"><button type="button" onclick="event.stopPropagation();selectOllamaModelFromGuide('mistral-nemo:12b')" class="omg-select-btn">Use</button></td>
+                        </tr>
+                        <tr class="omg-row" onclick="selectOllamaModelFromGuide('phi4')">
+                            <td class="omg-td-name">phi4</td>
+                            <td class="omg-td-basic omg-td-compat">MacBook M2 Pro / M3 or later &nbsp;·&nbsp; High-spec PC with 32 GB RAM</td>
+                            <td class="omg-td-adv omg-td-num">14B</td><td class="omg-td-adv omg-td-num">~8.9 GB</td><td class="omg-td-adv omg-td-num">16 GB</td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-slow">Slow</span></td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-great">Great</span></td>
+                            <td class="omg-td-desc">Microsoft Phi-4, top-tier quality</td>
+                            <td class="omg-td-btn"><button type="button" onclick="event.stopPropagation();selectOllamaModelFromGuide('phi4')" class="omg-select-btn">Use</button></td>
+                        </tr>
+
+                        <!-- ── Reasoning ── -->
+                        <tr class="omg-section-hdr"><td colspan="9">🧠 Reasoning — chain-of-thought, deep analysis</td></tr>
+                        <tr class="omg-row" onclick="selectOllamaModelFromGuide('deepseek-r1:7b')">
+                            <td class="omg-td-name">deepseek-r1:7b</td>
+                            <td class="omg-td-basic omg-td-compat">MacBook M1 Pro / M2 or later &nbsp;·&nbsp; PC with 16 GB RAM</td>
+                            <td class="omg-td-adv omg-td-num">7B</td><td class="omg-td-adv omg-td-num">~4.7 GB</td><td class="omg-td-adv omg-td-num">8 GB</td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-med">Medium</span></td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-good">Good</span></td>
+                            <td class="omg-td-desc">Chain-of-thought, step-by-step reasoning</td>
+                            <td class="omg-td-btn"><button type="button" onclick="event.stopPropagation();selectOllamaModelFromGuide('deepseek-r1:7b')" class="omg-select-btn">Use</button></td>
+                        </tr>
+                        <tr class="omg-row" onclick="selectOllamaModelFromGuide('deepseek-r1:14b')">
+                            <td class="omg-td-name">deepseek-r1:14b</td>
+                            <td class="omg-td-basic omg-td-compat">MacBook M2 Pro / M3 or later &nbsp;·&nbsp; High-spec PC with 32 GB RAM</td>
+                            <td class="omg-td-adv omg-td-num">14B</td><td class="omg-td-adv omg-td-num">~8.9 GB</td><td class="omg-td-adv omg-td-num">16 GB</td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-slow">Slow</span></td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-great">Great</span></td>
+                            <td class="omg-td-desc">Deep multi-step reasoning</td>
+                            <td class="omg-td-btn"><button type="button" onclick="event.stopPropagation();selectOllamaModelFromGuide('deepseek-r1:14b')" class="omg-select-btn">Use</button></td>
+                        </tr>
+
+                        <!-- ── Code ── -->
+                        <tr class="omg-section-hdr"><td colspan="9">💻 Code — optimised for programming tasks</td></tr>
+                        <tr class="omg-row" onclick="selectOllamaModelFromGuide('codellama:7b')">
+                            <td class="omg-td-name">codellama:7b</td>
+                            <td class="omg-td-basic omg-td-compat">MacBook M1 Pro / M2 or later &nbsp;·&nbsp; PC with 16 GB RAM</td>
+                            <td class="omg-td-adv omg-td-num">7B</td><td class="omg-td-adv omg-td-num">~3.8 GB</td><td class="omg-td-adv omg-td-num">8 GB</td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-med">Medium</span></td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-good">Good</span></td>
+                            <td class="omg-td-desc">Meta Code Llama, code generation</td>
+                            <td class="omg-td-btn"><button type="button" onclick="event.stopPropagation();selectOllamaModelFromGuide('codellama:7b')" class="omg-select-btn">Use</button></td>
+                        </tr>
+                        <tr class="omg-row" onclick="selectOllamaModelFromGuide('qwen2.5-coder:7b')">
+                            <td class="omg-td-name">qwen2.5-coder:7b</td>
+                            <td class="omg-td-basic omg-td-compat">MacBook M1 Pro / M2 or later &nbsp;·&nbsp; PC with 16 GB RAM</td>
+                            <td class="omg-td-adv omg-td-num">7B</td><td class="omg-td-adv omg-td-num">~4.4 GB</td><td class="omg-td-adv omg-td-num">8 GB</td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-med">Medium</span></td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-great">Great</span></td>
+                            <td class="omg-td-desc">Best coding model in the list</td>
+                            <td class="omg-td-btn"><button type="button" onclick="event.stopPropagation();selectOllamaModelFromGuide('qwen2.5-coder:7b')" class="omg-select-btn">Use</button></td>
+                        </tr>
+
+                        <!-- ── Cloud ── -->
+                        <tr class="omg-section-hdr"><td colspan="9">☁️ Cloud — hosted by provider, no local download</td></tr>
+                        <tr class="omg-row" onclick="selectOllamaModelFromGuide('kimi-k2.5:cloud')">
+                            <td class="omg-td-name">kimi-k2.5:cloud <span class="omg-chip omg-chip-installed">Installed</span></td>
+                            <td class="omg-td-basic omg-td-compat">Any device — no local download or RAM requirement</td>
+                            <td class="omg-td-adv omg-td-num">—</td><td class="omg-td-adv omg-td-num">—</td><td class="omg-td-adv omg-td-num">—</td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-fast">Fast</span></td>
+                            <td class="omg-td-adv omg-td-meta"><span class="omg-pill omg-pill-great">Great</span></td>
+                            <td class="omg-td-desc">Moonshot Kimi K2.5 — runs on Moonshot's servers</td>
+                            <td class="omg-td-btn"><button type="button" onclick="event.stopPropagation();selectOllamaModelFromGuide('kimi-k2.5:cloud')" class="omg-select-btn">Use</button></td>
+                        </tr>
+
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Footer -->
+            <div style="padding:13px 22px; border-top:1px solid #ececec; display:flex; align-items:center; justify-content:space-between; gap:8px; background:#fafafa;">
+                <span style="font-size:0.79em; color:#aaa; font-family:'Nunito',sans-serif;">Models download once and cache locally — re-running setup with the same model is instant.</span>
+                <a href="https://ollama.com/library" target="_blank" style="font-size:0.79em; color:#666; text-decoration:none; font-weight:600; font-family:'Nunito',sans-serif; white-space:nowrap;" onmouseover="this.style.color='#111'" onmouseout="this.style.color='#666'">Browse full library ↗</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function omgSetMode(mode) {
+            var wrap = document.getElementById('omg-table-wrap');
+            if (wrap) wrap.className = 'omg-mode-' + mode;
+            var basic = document.getElementById('omg-toggle-basic');
+            var adv   = document.getElementById('omg-toggle-adv');
+            if (basic) { basic.classList.toggle('omg-toggle-active', mode === 'basic'); }
+            if (adv)   { adv.classList.toggle('omg-toggle-active',   mode === 'adv');   }
+        }
+    </script>
+
+    <style>
+        /* ── Ollama Model Guide ─────────────────────────────────────── */
+        .omg-section-hdr td {
+            padding: 9px 22px;
+            font-size: 0.77em;
+            font-weight: 700;
+            color: #666;
+            background: #f6f6f6;
+            border-top: 1.5px solid #e8e8e8;
+            border-bottom: 1px solid #ececec;
+            font-family: 'Nunito', sans-serif;
+            letter-spacing: 0.01em;
+        }
+
+        .omg-row {
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.12s;
+        }
+        .omg-row:hover { background: #f5f7fa; }
+
+        .omg-chip {
+            display: inline-block;
+            padding: 2px 7px;
+            border-radius: 5px;
+            font-size: 0.67em;
+            font-weight: 700;
+            margin-left: 6px;
+            vertical-align: middle;
+            font-family: 'Nunito', sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            letter-spacing: 0.03em;
+        }
+        .omg-chip-installed {
+            background: #f0faf1;
+            color: #237a35;
+            border: 1px solid #b8e4bf;
+        }
+
+        .omg-pill {
+            display: inline-block;
+            padding: 2px 9px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+            font-family: 'Nunito', sans-serif;
+            background: #f0f0f0;
+            color: #666;
+            white-space: nowrap;
+        }
+        .omg-pill-fast  { background: #e8f5e9; color: #2e7d32; }
+        .omg-pill-med   { background: #fff8e1; color: #e65100; }
+        .omg-pill-slow  { background: #fce4ec; color: #c62828; }
+        .omg-pill-good  { background: #e3f2fd; color: #1565c0; }
+        .omg-pill-great { background: #ede7f6; color: #4527a0; }
+
+        /* ── Basic / Advanced column toggle ── */
+        #omg-table-wrap.omg-mode-basic .omg-th-adv,
+        #omg-table-wrap.omg-mode-basic .omg-td-adv  { display: none; }
+        #omg-table-wrap.omg-mode-adv  .omg-th-basic,
+        #omg-table-wrap.omg-mode-adv  .omg-td-basic { display: none; }
+
+        .omg-td-compat {
+            padding: 12px 14px;
+            color: #444;
+            font-family: 'Nunito', sans-serif;
+            font-size: 0.88em;
+            line-height: 1.4;
+            min-width: 230px;
+        }
+
+        .omg-td-name { padding: 12px 22px; font-weight: 700; color: #1a1a1a; white-space: nowrap; font-family: 'Nunito', sans-serif; font-size: 0.94em; }
+        .omg-td-num  { padding: 12px 14px; color: #999; white-space: nowrap; font-family: 'Nunito', sans-serif; font-size: 0.9em; }
+        .omg-td-meta { padding: 12px 14px; white-space: nowrap; font-family: 'Nunito', sans-serif; }
+        .omg-td-desc { padding: 12px 22px; color: #555; font-family: 'Nunito', sans-serif; font-size: 0.92em; line-height: 1.4; }
+        .omg-td-btn  { padding: 12px 16px; }
+
+        /* Basic / Advanced toggle buttons */
+        .omg-toggle-btn {
+            padding: 5px 16px !important;
+            border-radius: 6px !important;
+            border: none !important;
+            cursor: pointer !important;
+            font-size: 0.78em !important;
+            font-weight: 700 !important;
+            font-family: 'Nunito', sans-serif !important;
+            background: transparent !important;
+            color: #888 !important;
+            box-shadow: none !important;
+            transition: all 0.15s !important;
+            white-space: nowrap !important;
+        }
+        .omg-toggle-btn.omg-toggle-active {
+            background: #5b21b6 !important;
+            color: #ffffff !important;
+            box-shadow: 0 1px 4px rgba(91,33,182,0.22) !important;
+        }
+        .omg-toggle-btn:hover:not(.omg-toggle-active) {
+            background: rgba(91,33,182,0.08) !important;
+            color: #5b21b6 !important;
+        }
+
+        .omg-select-btn {
+            background: #5b21b6 !important;
+            border: none !important;
+            border-radius: 7px !important;
+            padding: 6px 16px !important;
+            font-size: 0.8em !important;
+            font-weight: 700 !important;
+            color: #ffffff !important;
+            cursor: pointer !important;
+            white-space: nowrap !important;
+            font-family: 'Nunito', sans-serif !important;
+            box-shadow: 0 1px 4px rgba(91,33,182,0.18) !important;
+            transition: background 0.15s, transform 0.1s !important;
+            letter-spacing: 0.02em !important;
+        }
+        .omg-select-btn:hover { background: #7c3aed !important; transform: translateY(-1px) !important; }
+        .omg-select-btn:active { background: #4c1d95 !important; transform: none !important; }
+    </style>
 </body>
 </html>

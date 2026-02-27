@@ -21,7 +21,7 @@ Custom-Nerd/Nerd-Engine is a sophisticated web-based LLM-powered research assist
 ### Core Capabilities
 - **Multi-Database Academic Search**: PubMed, IEEE Xplore, Springer, Wiley, Oxford Academic, Stack Overflow
 - **Domain-Specific Configuration**: Customizable for any research domain (Diet, News, Space, Science, Cloud, etc.)
-- **Evidence-Based Response Generation**: LLM-powered synthesis with academic citations (OpenAI GPT & Google Gemini support)
+- **Evidence-Based Response Generation**: LLM-powered synthesis with academic citations (OpenAI GPT, Google Gemini, or Anthropic Claude support)
 - **Real-Time Processing Updates**: Server-Sent Events (SSE) for live progress tracking
 - **PDF Document Processing**: Local file upload and analysis capabilities
 - **Similarity Search**: Advanced question matching using TF-IDF, Jaccard, and fuzzy algorithms
@@ -45,7 +45,7 @@ graph TB
     subgraph "Backend Layer"
         API[FastAPI Server]
         Processor[Query Processor]
-        LLM[LLM Integration<br/>OpenAI & Gemini]
+        LLM[LLM Integration<br/>OpenAI, Gemini & Claude]
     end
     
     subgraph "Data Sources"
@@ -578,27 +578,30 @@ saved_states/
   - Limited full-text access
 - **Authentication**: API key and app header required
 
-### LLM Integration (OpenAI & Google Gemini)
+### LLM Integration (OpenAI, Google Gemini & Anthropic Claude)
 
 #### **Model Configuration**
 - **OpenAI Models**: GPT-4-turbo (primary), GPT-3.5-turbo (fallback)
 - **Google Gemini Models**: Gemini-2.5-flash (primary)
-- **LLM Selection**: Configurable via `LLM` environment variable (OpenAI/Gemini)
+- **Anthropic Claude Models**: claude-sonnet-4-5 (primary)
+- **LLM Selection**: Configurable via `LLM` environment variable (OpenAI, Gemini, or Claude)
 - **Temperature Settings**: Vary by task (0.1-0.7)
 - **Token Management**: Dynamic limiting based on content length
 - **Error Handling**: Exponential backoff for rate limits
 
 #### **LLM Provider Selection**
-The system supports both OpenAI and Google Gemini models with automatic routing:
+The system supports OpenAI, Google Gemini, and Anthropic Claude with automatic routing:
 
 **Configuration Method:**
 - Set `LLM="OpenAI"` in `variables.env` for OpenAI models
 - Set `LLM="Gemini"` in `variables.env` for Google Gemini models
+- Set `LLM="Claude"` in `variables.env` for Anthropic Claude models
 - System automatically routes all LLM calls to the selected provider
 
 **Implementation Architecture:**
-- `openai_executions.py`: Contains all OpenAI-specific API implementations
-- `gemini_executions.py`: Contains all Google Gemini-specific API implementations
+- `openai_executions.py`: OpenAI-specific API implementations
+- `gemini_executions.py`: Google Gemini-specific API implementations
+- `claude_executions.py`: Anthropic Claude-specific API implementations
 - `helper_functions.py`: Routes calls based on `LLM` environment variable
 - Seamless switching between providers without code changes
 
@@ -756,17 +759,18 @@ pdfFiles.forEach((file) => formData.append('files', file));
 #### **Required API Keys**
 1. **NCBI_API_KEY**: PubMed access (3 req/sec limit)
 2. **OPENAI_API_KEY**: OpenAI LLM processing (GPT-4-turbo) - OR -
-3. **GEMINI_API_KEY**: Google Gemini LLM processing (Gemini-2.5-flash)
-4. **ELSEVIER_API_KEY**: Elsevier article access
-5. **SPRINGER_API_KEY**: Springer Nature content
-6. **WILEY_API_KEY**: Wiley full-text access
-7. **ENTREZ_EMAIL**: Required for Bio.Entrez
-8. **OXFORD_API_KEY**: Oxford Academic access
-9. **OXFORD_APP_HEADER**: Oxford API authentication
-10. **GNEWS_API_KEY**: GNews API access (NewsNerd)
-11. **NEWS_API_KEY**: NewsAPI access (NewsNerd)
-12. **GUARDIAN_API_KEY**: The Guardian Open Platform (NewsNerd)
-13. **ADS_API_TOKEN**: NASA ADS API token (SpaceNerd, if used)
+3. **GEMINI_API_KEY**: Google Gemini LLM processing (Gemini-2.5-flash) - OR -
+4. **ANTHROPIC_API_KEY**: Anthropic Claude LLM processing (claude-sonnet-4-5). Set `LLM="Claude"` when using this key.
+6. **ELSEVIER_API_KEY**: Elsevier article access
+7. **SPRINGER_API_KEY**: Springer Nature content
+8. **WILEY_API_KEY**: Wiley full-text access
+9. **ENTREZ_EMAIL**: Required for Bio.Entrez
+10. **OXFORD_API_KEY**: Oxford Academic access
+11. **OXFORD_APP_HEADER**: Oxford API authentication
+12. **GNEWS_API_KEY**: GNews API access (NewsNerd)
+13. **NEWS_API_KEY**: NewsAPI access (NewsNerd)
+14. **GUARDIAN_API_KEY**: The Guardian Open Platform (NewsNerd)
+15. **ADS_API_TOKEN**: NASA ADS API token (SpaceNerd, if used)
 
 #### **Development vs Production**
 - **Development**: Local server (127.0.0.1:8000)

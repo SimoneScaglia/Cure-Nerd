@@ -171,7 +171,6 @@ requests-oauthlib==2.0.0
 rich==13.7.1
 rsa==4.9
 safetensors
-setuptools<70  # pkg_resources removed in setuptools 70+
 scikit-learn==1.6.1
 scipy==1.15.2
 shellingham==1.5.4

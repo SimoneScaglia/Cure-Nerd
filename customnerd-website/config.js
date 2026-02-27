@@ -1335,7 +1335,7 @@ async function loadEnvConfig() {
                         value: initialEnvConfig[trimmedKey],
                         isPredefined: true
                     });
-                } else if (trimmedKey !== 'OPENAI_API_KEY' && trimmedKey !== 'GEMINI_API_KEY' && trimmedKey !== 'ANTHROPIC_API_KEY' && trimmedKey !== 'LLM') {
+                } else if (trimmedKey !== 'OPENAI_API_KEY' && trimmedKey !== 'GEMINI_API_KEY' && trimmedKey !== 'ANTHROPIC_API_KEY' && trimmedKey !== 'LLM' && trimmedKey !== 'OLLAMA_MODEL' && trimmedKey !== 'OLLAMA_BASE_URL') {
                     // This is a custom API key
                     customApiKeys.push({
                         name: trimmedKey,
@@ -1374,7 +1374,26 @@ async function loadEnvConfig() {
         if (claudeInput) {
             claudeInput.value = initialEnvConfig['ANTHROPIC_API_KEY'] || '';
         }
-        
+
+        // Load Ollama settings
+        const ollamaModelInput = document.getElementById('OLLAMA_MODEL');
+        const ollamaBaseUrlInput = document.getElementById('OLLAMA_BASE_URL');
+        if (ollamaModelInput) {
+            const savedModel = initialEnvConfig['OLLAMA_MODEL'] || 'llama3.2';
+            ollamaModelInput.value = savedModel;
+            if (typeof syncOllamaModelSelect === 'function') syncOllamaModelSelect(savedModel);
+            // Show/hide custom row based on whether loaded model is predefined or custom
+            const ollamaSelect = document.getElementById('OLLAMA_MODEL_SELECT');
+            if (ollamaSelect && typeof syncOllamaModelInput === 'function') {
+                syncOllamaModelInput(ollamaSelect.value);
+                // Restore the actual model name if the row ended up custom
+                if (ollamaSelect.value === 'custom') ollamaModelInput.value = savedModel;
+            }
+        }
+        if (ollamaBaseUrlInput) {
+            ollamaBaseUrlInput.value = initialEnvConfig['OLLAMA_BASE_URL'] || 'http://localhost:11434';
+        }
+
         // setLLMProvider already syncs hidden input and tab state
         // Render custom API keys (including predefined ones)
         renderCustomApiKeys();
@@ -1735,7 +1754,13 @@ async function updateEnvConfig() {
     updatedEnvConfig.OPENAI_API_KEY = openaiInput ? (openaiInput.value || '') : '';
     updatedEnvConfig.GEMINI_API_KEY = geminiInput ? (geminiInput.value || '') : '';
     updatedEnvConfig.ANTHROPIC_API_KEY = claudeInput ? (claudeInput.value || '') : '';
-    
+
+    // Collect Ollama settings
+    const ollamaModelInput = document.getElementById('OLLAMA_MODEL');
+    const ollamaBaseUrlInput = document.getElementById('OLLAMA_BASE_URL');
+    updatedEnvConfig.OLLAMA_MODEL = ollamaModelInput ? (ollamaModelInput.value.trim() || 'llama3.2') : 'llama3.2';
+    updatedEnvConfig.OLLAMA_BASE_URL = ollamaBaseUrlInput ? (ollamaBaseUrlInput.value.trim() || 'http://localhost:11434') : 'http://localhost:11434';
+
     // Update custom API keys from the DOM
     customApiKeys.forEach((key, index) => {
         const valueElement = document.getElementById(`custom_key_${index}`);
@@ -1749,14 +1774,21 @@ async function updateEnvConfig() {
         updatedEnvConfig[key.name] = key.value;
     });
 
-    // Validate required fields based on current provider
-    const requiredFields = currentProvider === 'Gemini' ? ['GEMINI_API_KEY'] : (currentProvider === 'Claude' ? ['ANTHROPIC_API_KEY'] : ['OPENAI_API_KEY']);
-    const missingFields = requiredFields.filter(field => !updatedEnvConfig[field] || updatedEnvConfig[field].trim() === '');
-    
-    if (missingFields.length > 0) {
-        const providerName = currentProvider === 'Gemini' ? 'Gemini' : (currentProvider === 'Claude' ? 'Claude (Anthropic)' : 'OpenAI');
-        showNotification('error', `Required ${providerName} API key is missing. Please enter your ${providerName} API key.`);
-        return;
+    // Validate required fields based on current provider (Ollama requires no API key)
+    if (currentProvider !== 'Ollama') {
+        const requiredFields = currentProvider === 'Gemini' ? ['GEMINI_API_KEY'] : (currentProvider === 'Claude' ? ['ANTHROPIC_API_KEY'] : ['OPENAI_API_KEY']);
+        const missingFields = requiredFields.filter(field => !updatedEnvConfig[field] || updatedEnvConfig[field].trim() === '');
+        if (missingFields.length > 0) {
+            const providerName = currentProvider === 'Gemini' ? 'Gemini' : (currentProvider === 'Claude' ? 'Claude (Anthropic)' : 'OpenAI');
+            showNotification('error', `Required ${providerName} API key is missing. Please enter your ${providerName} API key.`);
+            return;
+        }
+    } else {
+        // For Ollama, validate that a model name is provided
+        if (!updatedEnvConfig.OLLAMA_MODEL) {
+            showNotification('error', 'Please enter an Ollama model name (e.g. llama3.2).');
+            return;
+        }
     }
 
     try {
@@ -1767,7 +1799,11 @@ async function updateEnvConfig() {
         });
 
         if (response.ok) {
-            showNotification('success', `Environment Configuration updated successfully! `);
+            showNotification('success', 'Environment Configuration saved successfully!');
+            // If Ollama is the selected provider, automatically run setup
+            if (currentProvider === 'Ollama') {
+                setupOllama(updatedEnvConfig.OLLAMA_MODEL || 'llama3.2');
+            }
         } else {
             showNotification('error', 'Error updating environment configuration.');
         }
@@ -1775,6 +1811,273 @@ async function updateEnvConfig() {
         console.error('Error updating environment config:', error);
         showNotification('error', 'Error connecting to server.');
     }
+}
+
+/**
+ * Connect to /ollama_setup via SSE and stream progress into the setup panel.
+ * Called automatically after saving config when Ollama provider is selected.
+ */
+// ── API key / connection tester ──────────────────────────────────────────────
+
+const _PROVIDER_KEY_ID = {
+    openai: 'OPENAI_API_KEY',
+    gemini: 'GEMINI_API_KEY',
+    claude: 'ANTHROPIC_API_KEY',
+    ollama: null,
+};
+
+async function testApiKey(provider) {
+    const btnEl   = document.getElementById('test_btn_' + provider);
+    const resultEl = document.getElementById(provider + '_test_result');
+    const keyInputId = _PROVIDER_KEY_ID[provider];
+    const apiKey = keyInputId ? ((document.getElementById(keyInputId) || {}).value || '').trim() : '';
+
+    if (provider !== 'ollama' && !apiKey) {
+        _showTestResult(resultEl, false, 'Enter your API key first.');
+        return;
+    }
+
+    // Loading state
+    if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.innerHTML = '<span style="display:inline-block;width:12px;height:12px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:ollama_spin 0.7s linear infinite;vertical-align:middle;margin-right:4px;"></span>Testing…';
+    }
+    if (resultEl) resultEl.style.display = 'none';
+
+    try {
+        const resp = await fetch(baseURL + '/test_api_key/' + provider, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ api_key: apiKey }),
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+        _showTestResult(resultEl, data.ok, data.message);
+    } catch (e) {
+        _showTestResult(resultEl, false, 'Could not reach backend — make sure the server is running.');
+    } finally {
+        if (btnEl) {
+            btnEl.disabled = false;
+            btnEl.innerHTML = '<i class="fas fa-plug"></i> ' + (provider === 'ollama' ? 'Test Connection' : 'Test');
+        }
+    }
+}
+
+function _showTestResult(el, ok, message) {
+    if (!el) return;
+    el.style.display = 'flex';
+    if (ok) {
+        el.style.background = 'rgba(40, 167, 69, 0.08)';
+        el.innerHTML = '<i class="fas fa-check-circle" style="color:#28a745;flex-shrink:0;"></i> <span style="color:#28a745;">' + message + '</span>';
+    } else {
+        el.style.background = 'rgba(220, 53, 69, 0.08)';
+        el.innerHTML = '<i class="fas fa-times-circle" style="color:#dc3545;flex-shrink:0;"></i> <span style="color:#dc3545;">' + message + '</span>';
+    }
+}
+
+// ── End API key tester ───────────────────────────────────────────────────────
+
+// ── Ollama pre-flight status check ──────────────────────────────────────────
+
+/**
+ * Polls /ollama_status and updates the three indicator dots + banner text.
+ * Safe to call at any time; does nothing if the status card is not in the DOM.
+ */
+async function checkOllamaStatus() {
+    var checkingEl = document.getElementById('ollama_status_checking');
+    if (checkingEl) { checkingEl.style.display = 'inline'; }
+
+    // Reset all dots to pending while we wait
+    ['installed', 'running', 'model'].forEach(function(k) {
+        var dot = document.getElementById('ollama_ind_' + k);
+        if (dot) { dot.className = 'ollama-status-dot ollama-dot-pending'; }
+        var noteEl = document.getElementById('ollama_ind_' + k + '_note');
+        if (noteEl) noteEl.textContent = 'checking…';
+    });
+
+    try {
+        var resp = await fetch(baseURL + '/ollama_status');
+        if (!resp.ok) throw new Error('status ' + resp.status);
+        var data = await resp.json();
+
+        // Installed
+        _setStatusDot(
+            'installed',
+            data.is_installed,
+            data.is_installed ? 'Found on this machine' : 'Not installed — will be installed automatically'
+        );
+
+        // Running
+        _setStatusDot(
+            'running',
+            data.is_running,
+            data.is_running ? 'Listening on port 11434' : 'Not running — will be started automatically'
+        );
+
+        // Model available
+        var modelInput = document.getElementById('OLLAMA_MODEL');
+        var currentModel = (modelInput && modelInput.value) ? modelInput.value.trim() : 'llama3.2';
+        var baseName = currentModel.split(':')[0];
+        var installedModels = data.installed_models || [];
+        var modelPulled = installedModels.some(function(m) {
+            return m === currentModel || m.startsWith(baseName + ':') || m.startsWith(baseName + ' ');
+        });
+
+        var modelLabelEl = document.getElementById('ollama_ind_model_label');
+        if (modelLabelEl) modelLabelEl.textContent = 'Model \u2018' + currentModel + '\u2019';
+
+        _setStatusDot(
+            'model',
+            modelPulled,
+            modelPulled ? 'Already pulled \u2714' : 'Not downloaded — will be pulled automatically'
+        );
+
+        // Cache for other functions to use
+        window._ollamaStatusCache = { data: data, modelPulled: modelPulled, currentModel: currentModel };
+
+        // Update dynamic banner
+        _updateOllamaBanner(data.is_installed, data.is_running, modelPulled);
+
+    } catch (e) {
+        ['installed', 'running', 'model'].forEach(function(k) {
+            var dot = document.getElementById('ollama_ind_' + k);
+            if (dot) { dot.className = 'ollama-status-dot ollama-dot-pending'; }
+            var noteEl = document.getElementById('ollama_ind_' + k + '_note');
+            if (noteEl) noteEl.textContent = '';
+        });
+        var checkingTxt = document.getElementById('ollama_status_checking');
+        if (checkingTxt) { checkingTxt.textContent = '(backend offline — start backend first)'; }
+        return;
+    }
+
+    if (checkingEl) { checkingEl.style.display = 'none'; }
+}
+
+function _setStatusDot(key, ok, noteText) {
+    var dot = document.getElementById('ollama_ind_' + key);
+    var noteEl = document.getElementById('ollama_ind_' + key + '_note');
+    if (!dot) return;
+    if (ok) {
+        dot.className = 'ollama-status-dot ollama-dot-ok';
+    } else {
+        dot.className = 'ollama-status-dot ollama-dot-missing';
+    }
+    if (noteEl) noteEl.textContent = noteText || '';
+}
+
+function _updateOllamaBanner(isInstalled, isRunning, modelPulled) {
+    var banner = document.getElementById('ollama_status_banner_text');
+    if (!banner) return;
+    var allReady = isInstalled && isRunning && modelPulled;
+    if (allReady) {
+        banner.innerHTML = '<i class="fas fa-check-circle" style="color:#28a745;margin-right:6px;"></i>' +
+            '<strong>Ollama is ready!</strong> All systems are running. You can save and start using it now.';
+    } else {
+        var missing = [];
+        if (!isInstalled) missing.push('install Ollama');
+        if (!isRunning)   missing.push('start the server');
+        if (!modelPulled) missing.push('pull the selected model');
+        banner.innerHTML = '<i class="fas fa-magic" style="color:#7c3aed;margin-right:6px;"></i>' +
+            'Click <strong>Update Environment Configuration</strong> to automatically: ' +
+            missing.join(' \u2192 ') + '.';
+    }
+}
+
+// ── End Ollama pre-flight ────────────────────────────────────────────────────
+
+function setupOllama(model) {
+    if (!model) model = (document.getElementById('OLLAMA_MODEL') || {}).value || 'llama3.2';
+    model = model.trim();
+
+    const panel = document.getElementById('ollama_setup_panel');
+    const log   = document.getElementById('ollama_setup_log');
+    const title = document.getElementById('ollama_panel_title');
+    const spinner = document.getElementById('ollama_panel_spinner');
+
+    if (!panel) return;
+
+    // Reset & show panel
+    panel.style.display = 'block';
+    if (log) log.textContent = '';
+    if (title) { title.textContent = `Setting up Ollama with model '${model}'…`; title.style.color = '#7c3aed'; }
+    if (spinner) spinner.style.display = 'inline-block';
+
+    // Reset step icons
+    for (var s = 1; s <= 4; s++) {
+        var icon = document.getElementById('ollama_step_' + s + '_icon');
+        if (icon) { icon.textContent = '○'; icon.className = 'ollama-step-icon ollama-step-pending'; }
+    }
+
+    function appendLog(msg) {
+        if (!log) return;
+        log.textContent += msg + '\n';
+        log.scrollTop = log.scrollHeight;
+    }
+
+    function setStep(step, state) {
+        // state: 'active' | 'done' | 'error' | 'warn'
+        var icon = document.getElementById('ollama_step_' + step + '_icon');
+        if (!icon) return;
+        var map = { active: ['●', 'ollama-step-active'], done: ['✓', 'ollama-step-done'], error: ['✗', 'ollama-step-error'], warn: ['⚠', 'ollama-step-warn'] };
+        var entry = map[state] || ['○', 'ollama-step-pending'];
+        icon.textContent = entry[0];
+        icon.className = 'ollama-step-icon ' + entry[1];
+    }
+
+    var url = baseURL + '/ollama_setup?model=' + encodeURIComponent(model);
+    var es = new EventSource(url);
+
+    es.onmessage = function(e) {
+        try {
+            var data = JSON.parse(e.data);
+            var step = data.step || 0;
+            var type = data.type || 'progress';
+            var msg  = data.message || '';
+
+            if (step > 0) setStep(step, 'active');
+
+            switch (type) {
+                case 'success':
+                    if (step > 0) setStep(step, 'done');
+                    appendLog('✓ ' + msg);
+                    break;
+                case 'warning':
+                    if (step > 0) setStep(step, 'warn');
+                    appendLog('⚠ ' + msg);
+                    break;
+                case 'error':
+                    if (step > 0) setStep(step, 'error');
+                    appendLog('✗ ' + msg);
+                    break;
+                case 'fatal':
+                    appendLog('✗ FATAL: ' + msg);
+                    if (title) { title.textContent = 'Setup failed'; title.style.color = '#dc3545'; }
+                    if (spinner) spinner.style.display = 'none';
+                    es.close();
+                    break;
+                case 'complete':
+                    if (step > 0) setStep(step, 'done');
+                    appendLog('✓ ' + msg);
+                    if (title) { title.textContent = 'Ollama is ready!'; title.style.color = '#28a745'; }
+                    if (spinner) spinner.style.display = 'none';
+                    showNotification('success', 'Ollama setup complete — model is ready to use!');
+                    es.close();
+                    break;
+                default:
+                    // install_log / pull_log / progress
+                    appendLog(msg);
+            }
+        } catch(err) {
+            appendLog(e.data);
+        }
+    };
+
+    es.onerror = function() {
+        appendLog('Connection to setup stream lost. Check the backend console for details.');
+        if (title) { title.textContent = 'Setup stream ended'; title.style.color = '#6c757d'; }
+        if (spinner) spinner.style.display = 'none';
+        es.close();
+    };
 }
 
 function resetAllEnv() {
@@ -1810,7 +2113,24 @@ function resetAllEnv() {
         if (claudeInput) {
             claudeInput.value = initialEnvConfig.ANTHROPIC_API_KEY || '';
         }
-        
+
+        // Reset Ollama settings
+        const ollamaModelInput = document.getElementById('OLLAMA_MODEL');
+        const ollamaBaseUrlInput = document.getElementById('OLLAMA_BASE_URL');
+        if (ollamaModelInput) {
+            const savedModel = initialEnvConfig.OLLAMA_MODEL || 'llama3.2';
+            ollamaModelInput.value = savedModel;
+            if (typeof syncOllamaModelSelect === 'function') syncOllamaModelSelect(savedModel);
+            const ollamaSelect = document.getElementById('OLLAMA_MODEL_SELECT');
+            if (ollamaSelect && typeof syncOllamaModelInput === 'function') {
+                syncOllamaModelInput(ollamaSelect.value);
+                if (ollamaSelect.value === 'custom') ollamaModelInput.value = savedModel;
+            }
+        }
+        if (ollamaBaseUrlInput) {
+            ollamaBaseUrlInput.value = initialEnvConfig.OLLAMA_BASE_URL || 'http://localhost:11434';
+        }
+
         // Reset custom API keys (including predefined ones)
         customApiKeys = [];
         const predefinedKeys = [
@@ -1819,7 +2139,8 @@ function resetAllEnv() {
         ];
         
         for (const key in initialEnvConfig) {
-            if (key !== 'OPENAI_API_KEY' && key !== 'GEMINI_API_KEY' && key !== 'ANTHROPIC_API_KEY' && key !== 'LLM' && initialEnvConfig.hasOwnProperty(key)) {
+            if (key !== 'OPENAI_API_KEY' && key !== 'GEMINI_API_KEY' && key !== 'ANTHROPIC_API_KEY' && key !== 'LLM'
+                && key !== 'OLLAMA_MODEL' && key !== 'OLLAMA_BASE_URL' && initialEnvConfig.hasOwnProperty(key)) {
                 const isPredefined = predefinedKeys.includes(key);
                 customApiKeys.push({
                     name: key,
@@ -3601,17 +3922,19 @@ function forcePlaceholderVisibility(inputElement) {
     }
 }
 
-// Map data-side (3-segment pill) to provider name and back
-var LLM_SIDE_TO_PROVIDER = { left: 'OpenAI', center: 'Gemini', right: 'Claude' };
-var LLM_PROVIDER_TO_SIDE = { OpenAI: 'left', Gemini: 'center', Claude: 'right' };
+// Map data-side (4-segment pill) to provider name and back
+var LLM_SIDE_TO_PROVIDER = { left: 'OpenAI', center: 'Gemini', right: 'Claude', 'far-right': 'Ollama' };
+var LLM_PROVIDER_TO_SIDE = { OpenAI: 'left', Gemini: 'center', Claude: 'right', Ollama: 'far-right' };
 
-// Function to set LLM provider based on value (OpenAI, Gemini, or Claude)
+// Function to set LLM provider based on value (OpenAI, Gemini, Claude, or Ollama)
 function setLLMProvider(provider) {
-    const norm = (provider === 'OpenAI' || provider === 'Gemini' || provider === 'Claude') ? provider : 'OpenAI';
+    const validProviders = ['OpenAI', 'Gemini', 'Claude', 'Ollama'];
+    const norm = validProviders.includes(provider) ? provider : 'OpenAI';
     const side = LLM_PROVIDER_TO_SIDE[norm];
     const openaiSection = document.getElementById('openai_section');
     const geminiSection = document.getElementById('gemini_section');
     const claudeSection = document.getElementById('claude_section');
+    const ollamaSection = document.getElementById('ollama_section');
     const openaiInput = document.getElementById('OPENAI_API_KEY');
     const geminiInput = document.getElementById('GEMINI_API_KEY');
     const claudeInput = document.getElementById('ANTHROPIC_API_KEY');
@@ -3628,50 +3951,54 @@ function setLLMProvider(provider) {
     if (openaiSection) openaiSection.style.display = (norm === 'OpenAI') ? 'block' : 'none';
     if (geminiSection) geminiSection.style.display = (norm === 'Gemini') ? 'block' : 'none';
     if (claudeSection) claudeSection.style.display = (norm === 'Claude') ? 'block' : 'none';
+    if (ollamaSection) ollamaSection.style.display = (norm === 'Ollama') ? 'block' : 'none';
 
-    const focusInput = norm === 'OpenAI' ? openaiInput : (norm === 'Gemini' ? geminiInput : claudeInput);
-    setTimeout(function() {
-        if (focusInput && (!focusInput.value || focusInput.value === '')) {
-            focusInput.focus();
-            focusInput.blur();
-        }
-    }, 100);
-}
-
-// Cycle AI provider on seg-switch click (left -> center -> right -> left)
-function toggleLLMProvider(event) {
-    if (event) {
-        event.preventDefault();
-        event.stopPropagation();
+    if (norm !== 'Ollama') {
+        const focusInput = norm === 'OpenAI' ? openaiInput : (norm === 'Gemini' ? geminiInput : claudeInput);
+        setTimeout(function() {
+            if (focusInput && (!focusInput.value || focusInput.value === '')) {
+                focusInput.focus();
+                focusInput.blur();
+            }
+        }, 100);
+    } else {
+        // Auto-check Ollama status whenever the section becomes visible
+        setTimeout(checkOllamaStatus, 200);
     }
-    var modelSwitch = document.getElementById('modelSwitch');
-    if (!modelSwitch) return;
-    var side = modelSwitch.getAttribute('data-side') || 'left';
-    var nextSide = (side === 'left') ? 'center' : (side === 'center') ? 'right' : 'left';
-    var nextProvider = LLM_SIDE_TO_PROVIDER[nextSide];
-    setLLMProvider(nextProvider);
 }
 
 
-// Initialize 3-segment AI provider pill (click to cycle)
+
+// Initialize 4-segment AI provider pill
 function initModernToggle() {
     var modelSwitch = document.getElementById('modelSwitch');
-    if (modelSwitch) {
-        modelSwitch.addEventListener('click', function(e) {
-            e.preventDefault();
+    if (!modelSwitch) return;
+
+    // Attach a JS click listener to every label — belt-and-suspenders on top of
+    // the inline onclick attributes, so no parent element can swallow the event.
+    modelSwitch.querySelectorAll('[data-provider]').forEach(function(lbl) {
+        lbl.style.cursor = 'pointer';
+        lbl.addEventListener('click', function(e) {
             e.stopPropagation();
-            toggleLLMProvider(e);
+            var provider = lbl.getAttribute('data-provider');
+            if (provider) setLLMProvider(provider);
         });
-        modelSwitch.addEventListener('keydown', function(e) {
-            if (e.key === ' ' || e.key === 'Enter') {
-                e.preventDefault();
-                toggleLLMProvider(e);
-            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-                e.preventDefault();
-                toggleLLMProvider(e);
-            }
-        });
-    }
+    });
+
+    // Keyboard: Arrow keys cycle through providers
+    modelSwitch.addEventListener('keydown', function(e) {
+        var sides     = ['left', 'center', 'right', 'far-right'];
+        var providers = sides.map(function(s) { return LLM_SIDE_TO_PROVIDER[s]; });
+        var current   = modelSwitch.getAttribute('data-side') || 'left';
+        var idx       = sides.indexOf(current);
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            setLLMProvider(providers[(idx + 1) % providers.length]);
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            setLLMProvider(providers[(idx - 1 + providers.length) % providers.length]);
+        }
+    });
 }
 
 // Load saved states when the page loads

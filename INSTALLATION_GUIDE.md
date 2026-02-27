@@ -175,7 +175,7 @@ The server will start at `http://localhost:8000`
 ## Configure Your API Keys
 
 1. Open the file: `customnerd-backend/variables.env`
-2. Add your `OPENAI_API_KEY` (required)
+2. Add one of: `OPENAI_API_KEY`, `GEMINI_API_KEY`, or `ANTHROPIC_API_KEY` (required). Set `LLM="OpenAI"`, `LLM="Gemini"`, or `LLM="Claude"` to match the key you added.
 3. Save the file
 
 ---

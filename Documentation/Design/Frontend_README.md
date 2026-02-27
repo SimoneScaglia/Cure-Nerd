@@ -95,8 +95,25 @@ The configuration console allows an admin to edit frontend appearance, user flow
   - `GET /fetch_clean_query` and `POST /save_clean_query` are used to view/edit `clean_query.py` content.
 
 - Environment section (LLM and API keys)
-  - `GET /fetch_env_config` loads `LLM` provider selection (OpenAI/Gemini), preserves both API keys, and renders optional publisher keys (e.g., NCBI/Elsevier/Springer/Wiley/Oxford) and custom keys.
-  - `POST /update_env_config` saves environment updates, always preserving both OpenAI and Gemini keys and any custom keys.
+  - `GET /fetch_env_config` loads `LLM` provider selection (OpenAI/Gemini/Claude/**Ollama**), preserves all four provider keys, and renders optional publisher keys (e.g., NCBI/Elsevier/Springer/Wiley/Oxford) and custom keys.
+  - `POST /update_env_config` saves environment updates, always preserving OpenAI, Gemini, Claude, and Ollama (`OLLAMA_MODEL`, `OLLAMA_BASE_URL`) keys and any custom keys.
+  - **4-segment provider pill switch**: Clicking any of the four segments (OpenAI / Gemini / Claude / Ollama) directly activates that provider; no longer cycles. Fixed via CSS (`pointer-events: none` on the slider, `pointer-events: all` on labels) and explicit JS `click` listeners with `stopPropagation()` in `initModernToggle()`.
+  - **API key "Test" buttons**: Each cloud provider row (OpenAI, Gemini, Claude) now has a "Test" button. Clicking it calls `POST /test_api_key` with the current key value and displays an inline result (✓ / ✗ + message).
+  - **Ollama sub-section** (visible only when Ollama is selected):
+    - Pre-check status badge — fetches `GET /ollama_status` on load to indicate whether Ollama is installed, the server is running, and which models are already pulled.
+    - Model dropdown listing: `llama3.2`, `llama3.1:8b`, `phi3:mini`, `qwen3:8b`, `codellama:7b`, `kimi-k2.5:cloud`, plus a "Custom model name…" option.
+    - Custom model text input — only rendered when "Custom model name…" is selected; hidden otherwise.
+    - "Model Guide" (❓) button — opens the Ollama Model Guide modal (see below).
+    - "Setup Ollama" button — calls `GET /ollama_setup?model=<selected_model>` and streams progress over SSE into a step-by-step progress UI (4 steps: install → start server → pull model → verify).
+    - "Test Connection" button — calls `POST /test_api_key` with `provider: ollama` and shows inline connectivity result.
+
+- **Ollama Model Guide modal**
+  - Opened via `openOllamaGuide()` which also fetches `/ollama_status` to detect locally installed models.
+  - Displays a wide (max 1060px), filterable table of curated Ollama models organized by category sections (Recommended, Fast & Lightweight, Best Quality, Coding, etc.).
+  - Each row shows: model name, parameter size, disk footprint, minimum RAM, speed badge, quality badge, and a "Use" button that selects the model in the dropdown.
+  - **Basic / Advanced toggle**: "Basic" mode hides technical columns and instead shows a plain-language "Works best on" compatibility description (e.g., "MacBook M1 or later · Windows/Linux PC with 8 GB RAM"). "Advanced" mode shows the full technical breakdown.
+  - **Installed model detection**: Models already pulled locally receive an "Installed" chip next to their name. Models installed locally but not in the static table appear in a dynamically prepended "✅ Installed on your machine" section and are also added as options in the model dropdown under an "Installed" optgroup.
+  - Filterable by search text across model name and use-case descriptions.
 
 - Saved state management
   - `POST /save_state`, `GET /list_saved_states`, `POST /load_state`, and `POST /delete_state` support exporting/importing/deleting named configuration snapshots.
@@ -123,8 +140,10 @@ The configuration console allows an admin to edit frontend appearance, user flow
     - Frontend branding, text, styles, and `USER_FLOW` options.
     - Backend prompt templates and query-contention toggle.
     - “Backend files” (code snippets for the two search entry points and the `clean_query.py` helper) and associated labels/visibility.
-    - Environment keys, model provider toggle (OpenAI/Gemini), plus optional publisher keys and custom keys.
+    - Environment keys, model provider toggle (OpenAI/Gemini/Claude/Ollama, 4-segment pill), plus optional publisher keys and custom keys.
     - Saved state operations and hard reset.
+    - Ollama local setup flow with live SSE progress streaming, curated model dropdown, Ollama Model Guide modal (Basic/Advanced toggle, installed-model detection), and "Test Connection" button.
+    - API key "Test" buttons for OpenAI, Gemini, and Claude to validate keys inline.
 
 - `about.html` / `about.css`
   - Informational page describing the platform, key features, and team profiles. Loads `user_env.js` to set the logo with fallback to a default image.
@@ -163,6 +182,9 @@ Admin/config (from `config.js`):
 - `GET /fetch_hard_backup_config`, `POST /clear_chat_history`
 - `GET /fetch_clean_query`, `POST /save_clean_query`
 - `POST /generate_code_endpoint?type=...`, `POST /generate_prompt_endpoint`
+- `GET /ollama_status` — pre-check: installed, running, model list
+- `GET /ollama_setup?model=...` — SSE stream for automated Ollama install/serve/pull/verify
+- `POST /test_api_key` — inline API key validation (OpenAI, Gemini, Claude, Ollama)
 
 
 ## Data stored in localStorage (shared across pages)
@@ -215,5 +237,8 @@ Admin/config (from `config.js`):
 - References are rendered as links and opened in a dedicated page that reads citation artifacts from `localStorage`.
 - Caching in `localStorage` enables quick re-display of previous answers and a simple “similar questions” experience when chat history is enabled.
 - The system is intentionally “config-first”: prefer changing `user_env.js` or using `config.html` over code edits for routine adjustments.
+- The 4-segment LLM provider pill (OpenAI / Gemini / Claude / Ollama) uses direct `onclick` handlers per segment and CSS `pointer-events` tuning to ensure every segment is reliably clickable regardless of the animated slider overlay.
+- Ollama is the only provider that requires no cloud API key — the entire local setup (install, model pull, serve) is handled through the UI via the `/ollama_setup` SSE stream.
+- The Ollama Model Guide modal is opened via `openOllamaGuide()` which also calls `/ollama_status` so installed model detection and the model dropdown always reflect the current local state.
 
 

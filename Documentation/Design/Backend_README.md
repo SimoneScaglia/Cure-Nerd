@@ -2,8 +2,9 @@
 
 ## TL;DR
 - This FastAPI backend orchestrates a research QA pipeline: validate question → generate Article queries → collect articles → normalize/organize → optional full-text and PDF processing → relevance classification → evidence-trim → final answer synthesis → citations → (optional) chat history persist.
-- Pluggable LLM execution (OpenAI or Gemini) is selected via `LLM` in `variables.env`. All intelligent extraction, summarization, and classification steps route through `helper_functions.py`, which calls into `openai_executions.py` or `gemini_executions.py`.
+- Pluggable LLM execution (OpenAI, Gemini, Claude, or **Ollama**) is selected via `LLM` in `variables.env`. All intelligent extraction, summarization, and classification steps route through `helper_functions.py`, which calls into `openai_executions.py`, `gemini_executions.py`, `claude_executions.py`, or `ollama_executions.py`.
 - The main user-facing APIs live in `main.py`, which coordinates the entire flow and streams progress updates via Server-Sent Events (SSE).
+- **Ollama (local LLM)**: When `LLM=Ollama` the system connects to a locally running Ollama server via its OpenAI-compatible REST API (`http://localhost:11434/v1/`). The `/ollama_setup` SSE endpoint automates installation, server startup, and model download with per-platform multi-method fallback logic.
 
 
 ## Overview
@@ -41,7 +42,7 @@ flowchart LR
     R2["user_list_search.py"]
     R3["PDF ingestion"]
     A1["helper_functions.py"]
-    G1["openai_executions.py / gemini_executions.py\nopenai_prompts.py"]
+    G1["openai_executions.py / gemini_executions.py / claude_executions.py / ollama_executions.py\nopenai_prompts.py"]
   end
 
   R --- R1
@@ -77,9 +78,9 @@ sequenceDiagram
 
 
 ## Core execution model
-- LLM backend selection: `helper_functions.get_llm_client()` checks `LLM` in `variables.env` and routes calls to either OpenAI (`openai_executions.py`) or Gemini (`gemini_executions.py`).
+- LLM backend selection: `helper_functions.get_llm_client()` checks `LLM` in `variables.env` and routes calls to OpenAI (`openai_executions.py`), Gemini (`gemini_executions.py`), Claude (`claude_executions.py`), or Ollama (`ollama_executions.py`).
 - Prompting: Reusable prompt texts come from `openai_prompts.py` (OpenAI) and `generic_prompts.py` (Gemini-facing utility prompts). `main.py` can also fetch/update these at runtime.
-- Robustness: The LLM call layers contain retry wrappers to keep the pipeline resilient to transient errors.
+- Robustness: The LLM call layers contain retry wrappers to keep the pipeline resilient to transient errors. `ollama_executions.py` adds an additional `_safe_create()` wrapper that converts `NotFoundError` (model not pulled) and `APIConnectionError` (server not running) into descriptive `ValueError` messages rather than raw 500 errors.
 - Streaming UX: Progress updates are pushed over SSE via a per-session queue so the UI can show stepwise progress.
 
 
@@ -148,7 +149,7 @@ sequenceDiagram
 
 - helper_functions.py (pipeline coordinator and utilities)
   - LLM client selection and all high-level orchestration helpers (question validity, query generation, organization, relevance classification, trimming, final synthesis, reference mapping, PDF processing helpers, string cleaners, TF‑IDF utilities, etc.).
-  - Calls into `openai_executions.py` or `gemini_executions.py` for the actual LLM calls.
+  - Calls into `openai_executions.py`, `gemini_executions.py`, or `claude_executions.py` for the actual LLM calls.
 
 - openai_executions.py (OpenAI adapter)
   - Initializes OpenAI client from env.
@@ -156,7 +157,19 @@ sequenceDiagram
 
 - gemini_executions.py (Gemini adapter)
   - Initializes Gemini client from env.
+
+- claude_executions.py (Claude adapter)
+  - Initializes Anthropic client from env; same entrypoints as OpenAI/Gemini (validity, query gen, article type, PDF/section/final response, code/prompt generation).
   - Provides analogous functions to OpenAI adapter, with Gemini model routing.
+
+- ollama_executions.py (Ollama local-LLM adapter)
+  - Connects to the locally running Ollama server via its OpenAI-compatible API endpoint (`http://localhost:11434/v1/`).
+  - Reads the active model from `OLLAMA_MODEL` in `variables.env` (default: `llama3.2`).
+  - Exposes the same function signatures as the other adapters (question validity, query gen, article type, PDF/section/final response, code/prompt generation) so the pipeline is fully provider-agnostic.
+  - Includes a `_safe_create(**kwargs)` wrapper that catches:
+    - `openai.NotFoundError` → raises `ValueError("Ollama model '…' was not found — pull it first with 'ollama pull <model>'")`.
+    - `openai.APIConnectionError` → raises `ValueError("Cannot connect to Ollama server — ensure 'ollama serve' is running")`.
+  - Exposes `reinitialize_ollama_client()` so that saving a new model in the config UI takes effect immediately without a server restart.
 
 - openai_prompts.py (OpenAI prompt constants)
   - Source of truth for OpenAI prompt templates: question validity, query generation, relevance classifier, article type, abstract/summary prompts, relevant sections, final response format, and the `DISCLAIMER_TEXT`.
@@ -227,7 +240,48 @@ flowchart LR
     E21["GET /history_recent"]
     E22["GET /similar_questions"]
   end
+
+  subgraph Ollama
+    E23["GET /ollama_status"]
+    E24["GET /ollama_setup?model=..."]
+    E25["POST /test_api_key"]
+  end
 ```
+
+### Ollama-specific endpoints
+
+**`GET /ollama_status`**
+Returns a JSON object describing the current local Ollama environment:
+```json
+{
+  "is_installed": true,
+  "is_running": true,
+  "installed_models": ["llama3.2", "phi3:mini"]
+}
+```
+Used by the config UI to show pre-check badges before the user starts the setup flow and to populate the "Installed Models" section in the Model Guide.
+
+**`GET /ollama_setup?model=<model_name>`**
+Streams Ollama setup progress as Server-Sent Events (4 steps):
+1. **Check / install** — detects whether Ollama is present; if not, attempts installation using per-platform multi-method fallback (see below).
+2. **Start server** — starts `ollama serve` in the background if not already running; polls for up to 15 seconds.
+3. **Pull model** — runs `ollama pull <model>` and streams pull progress lines.
+4. **Verify** — confirms the model appears in `GET /api/tags`; emits `complete` event.
+
+Each SSE event carries: `{ type, step, total, message }` where `type` is one of `progress`, `success`, `warning`, `error`, `fatal`, `install_log`, `pull_log`, `complete`.
+
+**Installation fallback strategy per platform:**
+
+| Platform | Method 1 | Method 2 | Method 3 |
+|----------|----------|----------|----------|
+| macOS | `curl -fsSL https://ollama.com/install.sh \| sh` | `brew install ollama` (if Homebrew present) | Direct binary from GitHub Releases → `/usr/local/bin` |
+| Linux | `curl -fsSL https://ollama.com/install.sh \| sh` + `systemctl enable/start` | Arch-aware binary (`amd64`/`arm64`) → `~/.local/bin` | — |
+| Windows | PowerShell: `irm https://ollama.com/install.ps1 \| iex` | `winget install Ollama.Ollama` (if winget present) | — |
+
+Each method is tried in sequence; setup stops at the first success. A `fatal` SSE message is emitted if all methods fail, with platform-specific manual instructions.
+
+**`POST /test_api_key`**
+Accepts `{ provider, api_key }` (or no `api_key` for Ollama connection test) and returns `{ ok: bool, message: str }`. Supports providers: `openai`, `gemini`, `anthropic`, `ollama`.
 
 
 ## Environment & setup
@@ -243,8 +297,12 @@ pip install -r requirements.txt
 - Create or edit `variables.env` next to `main.py`. At minimum set:
   - `OPENAI_API_KEY` (required if `LLM=OpenAI`)
   - `GEMINI_API_KEY` (required if `LLM=Gemini`)
-  - `LLM` = `OpenAI` or `Gemini`
+  - `ANTHROPIC_API_KEY` (required if `LLM=Claude`)
+  - `LLM` = `OpenAI`, `Gemini`, `Claude`, or `Ollama`
+  - `OLLAMA_MODEL` (required if `LLM=Ollama`, e.g. `llama3.2`, `phi3:mini`, `llama3.1:8b`, `qwen3:8b`, `codellama:7b`)
+  - `OLLAMA_BASE_URL` (optional; defaults to `http://localhost:11434/v1/`)
 - Other provider keys are optional but supported (Elsevier, Springer, Wiley, etc.).
+- When `LLM=Ollama`, no cloud API key is needed. Use the Configuration UI → Environment → Ollama section to select a model and trigger the automated setup flow.
 
 3) Run the server
 ```bash
@@ -259,7 +317,7 @@ classDiagram
   class LLM_Provider {
     source: variables.env
     key: LLM
-    purpose: Select OpenAI or Gemini
+    purpose: Select OpenAI, Gemini, Claude, or Ollama
   }
   class OpenAI_Config {
     source: variables.env
@@ -270,6 +328,16 @@ classDiagram
     source: variables.env
     key: GEMINI_API_KEY
     purpose: Auth for Gemini calls
+  }
+  class Claude_Config {
+    source: variables.env
+    key: ANTHROPIC_API_KEY
+    purpose: Auth for Claude calls
+  }
+  class Ollama_Config {
+    source: variables.env
+    keys: OLLAMA_MODEL, OLLAMA_BASE_URL
+    purpose: Local model name and server URL (no cloud key needed)
   }
   class Entrez_Email {
     source: variables.env
@@ -321,7 +389,11 @@ Query lifecycle (developer view)
 ## Key takeaways for developers
 - `main.py` exposes the APIs, manages SSE, and orchestrates the pipeline.
 - `helper_functions.py` centralizes the pipeline steps and shields the rest of the code from model/provider specifics.
-- `openai_executions.py` and `gemini_executions.py` provide drop-in LLM backends; switch via `LLM` in `variables.env`.
+- `openai_executions.py`, `gemini_executions.py`, `claude_executions.py`, and `ollama_executions.py` provide drop-in LLM backends; switch via `LLM` in `variables.env`.
+- `ollama_executions.py` uses the OpenAI Python SDK pointed at `http://localhost:11434/v1/` — no separate SDK needed. All Ollama errors are surfaced as human-readable `ValueError` messages via `_safe_create()`.
+- The `/ollama_setup` SSE stream handles the full local-LLM lifecycle (install → serve → pull → verify) with multi-method per-platform fallbacks.
+- `/ollama_status` is a lightweight pre-check endpoint for the UI to show install/running/model status before triggering setup.
+- `/test_api_key` validates cloud API keys (OpenAI, Gemini, Claude) and tests Ollama server reachability in one unified endpoint.
 - Prompts live in `openai_prompts.py` and `generic_prompts.py` and can be fetched/updated at runtime.
 - Search is Article-first (`user_search_apis.py`), with optional ID augmentation (`user_list_search.py`) and optional PDF ingestion.
 - Final answers always include a disclaimer; references are parsed and mapped back to structured metadata.

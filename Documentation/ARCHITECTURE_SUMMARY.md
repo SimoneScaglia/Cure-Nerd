@@ -22,6 +22,12 @@ Custom-Nerd/Nerd-Engine is a modular, configurable academic research assistant t
    - Environment and API key management
    - Complete state save/restore functionality
 
+4. **Local LLM Support via Ollama**
+   - Run the full pipeline without any cloud API key using locally hosted models
+   - Automated install → serve → pull lifecycle managed entirely from the config UI
+   - Per-platform multi-method installation fallback ensures maximum compatibility
+   - Interactive Model Guide with Basic/Advanced toggle and live installed-model detection
+
 ### 🔄 **Processing Workflow Overview**
 
 ```
@@ -112,11 +118,12 @@ Templates include `openai_prompts.py`, `user_env.js`, `user_search_apis.py`, `us
 - **NASA ADS**: Peer-reviewed astronomy literature (token-based)
 - **Query Cleaning**: Advanced query preprocessing for complex astronomy terminology
 
-#### **LLM Integration (OpenAI)**
-- **GPT-4-turbo**: Primary model for all AI operations
+#### **LLM Integration (OpenAI, Gemini, Claude, Ollama)**
+- **OpenAI**: GPT-4-turbo primary; **Gemini**: Gemini-2.5-flash; **Claude**: claude-sonnet-4-5; **Ollama**: any locally hosted model (e.g., `llama3.2`, `phi3:mini`, `llama3.1:8b`, `qwen3:8b`, `codellama:7b`). Provider set via `LLM` in variables.env.
+- **Ollama (local)**: Uses OpenAI-compatible REST API at `http://localhost:11434/v1/`. No cloud key needed. Automated install/pull/serve lifecycle managed by `/ollama_setup` SSE endpoint with per-platform multi-method fallback (macOS: curl script → Homebrew → binary; Linux: curl script → arch binary; Windows: PowerShell script → winget).
 - **Prompt Engineering**: 10+ specialized prompts for different tasks
 - **Token Management**: Dynamic limiting and optimization
-- **Error Handling**: Robust retry mechanisms
+- **Error Handling**: Robust retry mechanisms; Ollama errors (`NotFoundError`, `APIConnectionError`) converted to descriptive user-facing messages via `_safe_create()` wrapper
 
 ### 📱 **Frontend Architecture**
 
@@ -156,6 +163,7 @@ Dynamic UI Application (user_based.js)
 3. **Real-Time Academic Research**: Live progress tracking for complex queries
 4. **Evidence-Based AI**: LLM responses backed by peer-reviewed sources
 5. **Zero-Code Customization**: Complete system customization via web interface
+6. **Local LLM with Zero Cloud Dependency**: Full Ollama integration with automated setup — users can run the entire system locally with no external API calls
 
 ### 🎯 **Use Case Adaptability**
 

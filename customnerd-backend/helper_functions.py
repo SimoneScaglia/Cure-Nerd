@@ -74,6 +74,11 @@ from claude_executions import (
     generate_content_from_pdf_claude, section_match_claude, generate_final_response_claude,
     generate_code_from_content_claude, generate_prompt_from_content_claude, _retryable_claude_call
 )
+from ollama_executions import (
+    determine_question_validity_ollama, query_generation_ollama, get_article_type_ollama,
+    generate_content_from_pdf_ollama, section_match_ollama, generate_final_response_ollama,
+    generate_code_from_content_ollama, generate_prompt_from_content_ollama, _retryable_ollama_call
+)
 
 def get_llm_client():
     """
@@ -91,6 +96,8 @@ def get_llm_client():
         return 'gemini'
     if llm_preference.lower() == 'claude':
         return 'claude'
+    if llm_preference.lower() == 'ollama':
+        return 'ollama'
     return 'openai'
 
 """# Step1. Evaluate Question Validity
@@ -115,6 +122,8 @@ def determine_question_validity(query):
         return determine_question_validity_openai(query, DETERMINE_QUESTION_VALIDITY_PROMPT)
     if llm_client == 'claude':
         return determine_question_validity_claude(query, DETERMINE_QUESTION_VALIDITY_PROMPT)
+    if llm_client == 'ollama':
+        return determine_question_validity_ollama(query, DETERMINE_QUESTION_VALIDITY_PROMPT)
     return determine_question_validity_gemini(query, DETERMINE_QUESTION_VALIDITY_PROMPT)
 
 
@@ -147,6 +156,8 @@ def query_generation(query):
         general_query, query_contention = query_generation_openai(query, GENERAL_QUERY_PROMPT, QUERY_CONTENTION_PROMPT, QUERY_CONTENTION_ENABLED)
     elif llm_client == 'claude':
         general_query, query_contention = query_generation_claude(query, GENERAL_QUERY_PROMPT, QUERY_CONTENTION_PROMPT, QUERY_CONTENTION_ENABLED)
+    elif llm_client == 'ollama':
+        general_query, query_contention = query_generation_ollama(query, GENERAL_QUERY_PROMPT, QUERY_CONTENTION_PROMPT, QUERY_CONTENTION_ENABLED)
     else:
         general_query, query_contention = query_generation_gemini(query, GENERAL_QUERY_PROMPT, QUERY_CONTENTION_PROMPT, QUERY_CONTENTION_ENABLED)
 
@@ -366,6 +377,14 @@ def organize_database_articles(article: Any, user_query: str) -> Dict[str, Any]:
             user=f"Article: {article_str}",
             temperature=0.1,
         )
+    elif llm_client == 'ollama':
+        extraction_raw = _retryable_ollama_call(
+            messages=[
+                {"role": "system", "content": extraction_prompt},
+                {"role": "user",   "content": article_str},
+            ],
+            temperature=0.1,
+        )
     else:
         extraction_raw = _retryable_gemini_call(
             prompt=f"{extraction_prompt}\n\nArticle: {article_str}",
@@ -405,6 +424,14 @@ def organize_database_articles(article: Any, user_query: str) -> Dict[str, Any]:
             user=f"Article: {article_str}",
             temperature=0.0,
         ).strip().lower()
+    elif llm_client == 'ollama':
+        pub_type_raw = _retryable_ollama_call(
+            messages=[
+                {"role": "system", "content": pub_type_prompt},
+                {"role": "user",   "content": article_str},
+            ],
+            temperature=0.0,
+        ).strip().lower()
     else:
         pub_type_raw = _retryable_gemini_call(
             prompt=f"{pub_type_prompt}\n\nArticle: {article_str}",
@@ -433,6 +460,14 @@ def organize_database_articles(article: Any, user_query: str) -> Dict[str, Any]:
                 user=f"Article: {article_str}",
                 temperature=0.4,
             )[:4000]
+        elif llm_client == 'ollama':
+            article_data["abstract"] = _retryable_ollama_call(
+                messages=[
+                    {"role": "system", "content": abstract_prompt},
+                    {"role": "user",   "content": article_str},
+                ],
+                temperature=0.4,
+            )[:4000]
         else:
             article_data["abstract"] = _retryable_gemini_call(
                 prompt=f"{abstract_prompt}\n\nArticle: {article_str}",
@@ -459,6 +494,14 @@ def organize_database_articles(article: Any, user_query: str) -> Dict[str, Any]:
             user=f"Abstract: {article_data['abstract']}",
             temperature=0.5,
         )
+    elif llm_client == 'ollama':
+        article_data["summary"] = _retryable_ollama_call(
+            messages=[
+                {"role": "system", "content": summary_prompt},
+                {"role": "user",   "content": article_data['abstract']},
+            ],
+            temperature=0.5,
+        )
     else:
         article_data["summary"] = _retryable_gemini_call(
             prompt=f"{summary_prompt}\n\nAbstract: {article_data['abstract']}",
@@ -480,6 +523,14 @@ def organize_database_articles(article: Any, user_query: str) -> Dict[str, Any]:
             article_data["title"] = _retryable_claude_call(
                 system=title_prompt,
                 user=f"Article: {article_str[:2000]}",
+                temperature=0.6,
+            )[:300]
+        elif llm_client == 'ollama':
+            article_data["title"] = _retryable_ollama_call(
+                messages=[
+                    {"role": "system", "content": title_prompt},
+                    {"role": "user",   "content": article_str[:2000]},
+                ],
                 temperature=0.6,
             )[:300]
         else:
@@ -504,6 +555,14 @@ def organize_database_articles(article: Any, user_query: str) -> Dict[str, Any]:
             article_data["author_name"] = _retryable_claude_call(
                 system=author_prompt,
                 user=f"Article: {article_str}",
+                temperature=0.2,
+            )[:500]
+        elif llm_client == 'ollama':
+            article_data["author_name"] = _retryable_ollama_call(
+                messages=[
+                    {"role": "system", "content": author_prompt},
+                    {"role": "user",   "content": article_str},
+                ],
                 temperature=0.2,
             )[:500]
         else:
@@ -710,6 +769,14 @@ def generate_summary(text: str):
             user=f"Text: {text}",
             temperature=0.5,
         )
+    elif llm_client == 'ollama':
+        summary = _retryable_ollama_call(
+            messages=[
+                {"role": "system", "content": summary_prompt},
+                {"role": "user",   "content": text},
+            ],
+            temperature=0.5,
+        )
     else:
         summary = _retryable_gemini_call(
             prompt=f"{summary_prompt}\n\nText: {text}",
@@ -768,6 +835,14 @@ def relevance_classifier(article: Dict[str, Any], user_query: str) -> tuple[str,
         relevance_raw = _retryable_claude_call(
             system=RELEVANCE_CLASSIFIER_PROMPT,
             user=f"Question: {user_query}\n\nArticle Content: {content_for_relevance}",
+            temperature=0.1,
+        )
+    elif llm_client == 'ollama':
+        relevance_raw = _retryable_ollama_call(
+            messages=[
+                {"role": "system", "content": RELEVANCE_CLASSIFIER_PROMPT},
+                {"role": "user",   "content": f"Question: {user_query}\n\nArticle Content: {content_for_relevance}"},
+            ],
             temperature=0.1,
         )
     else:
@@ -877,6 +952,8 @@ def get_article_type(abstract):
         return get_article_type_openai(abstract, ARTICLE_TYPE_PROMPT)
     if llm_client == 'claude':
         return get_article_type_claude(abstract, ARTICLE_TYPE_PROMPT)
+    if llm_client == 'ollama':
+        return get_article_type_ollama(abstract, ARTICLE_TYPE_PROMPT)
     return get_article_type_gemini(abstract, ARTICLE_TYPE_PROMPT)
 
 
@@ -900,12 +977,15 @@ def generate_content_from_pdf(pdf_text, content_type="abstract", publication_typ
     llm_client = get_llm_client()
     
     if llm_client == 'openai':
-        return generate_content_from_pdf_openai(pdf_text, content_type, publication_type, 
+        return generate_content_from_pdf_openai(pdf_text, content_type, publication_type,
                                               ABSTRACT_EXTRACTION_PROMPT, REVIEW_SUMMARY_PROMPT, STUDY_SUMMARY_PROMPT)
     if llm_client == 'claude':
-        return generate_content_from_pdf_claude(pdf_text, content_type, publication_type, 
+        return generate_content_from_pdf_claude(pdf_text, content_type, publication_type,
                                               ABSTRACT_EXTRACTION_PROMPT, REVIEW_SUMMARY_PROMPT, STUDY_SUMMARY_PROMPT)
-    return generate_content_from_pdf_gemini(pdf_text, content_type, publication_type, 
+    if llm_client == 'ollama':
+        return generate_content_from_pdf_ollama(pdf_text, content_type, publication_type,
+                                              ABSTRACT_EXTRACTION_PROMPT, REVIEW_SUMMARY_PROMPT, STUDY_SUMMARY_PROMPT)
+    return generate_content_from_pdf_gemini(pdf_text, content_type, publication_type,
                                               ABSTRACT_EXTRACTION_PROMPT, REVIEW_SUMMARY_PROMPT, STUDY_SUMMARY_PROMPT)
 
 
@@ -998,6 +1078,8 @@ def section_match(list_of_strings, required_titles):
             relevant_sections = section_match_openai(list_of_strings, RELEVANT_SECTIONS_PROMPT)
         elif llm_client == 'claude':
             relevant_sections = section_match_claude(list_of_strings, RELEVANT_SECTIONS_PROMPT)
+        elif llm_client == 'ollama':
+            relevant_sections = section_match_ollama(list_of_strings, RELEVANT_SECTIONS_PROMPT)
         else:
             relevant_sections = section_match_gemini(list_of_strings, RELEVANT_SECTIONS_PROMPT)
 
@@ -1316,6 +1398,8 @@ def generate_final_response(all_relevant_articles, query):
         return generate_final_response_openai(all_relevant_articles, query, FINAL_RESPONSE_PROMPT, DISCLAIMER_TEXT)
     if llm_client == 'claude':
         return generate_final_response_claude(all_relevant_articles, query, FINAL_RESPONSE_PROMPT, DISCLAIMER_TEXT)
+    if llm_client == 'ollama':
+        return generate_final_response_ollama(all_relevant_articles, query, FINAL_RESPONSE_PROMPT, DISCLAIMER_TEXT)
     return generate_final_response_gemini(all_relevant_articles, query, FINAL_RESPONSE_PROMPT, DISCLAIMER_TEXT)
 
 
@@ -1585,6 +1669,8 @@ def generate_code_from_content(article_content: str, type: str):
             return generate_code_from_content_openai(article_content, type, system_prompt_function_generator_list_search, system_prompt_function_generator_id_search)
         if llm_client == 'claude':
             return generate_code_from_content_claude(article_content, type, system_prompt_function_generator_list_search, system_prompt_function_generator_id_search)
+        if llm_client == 'ollama':
+            return generate_code_from_content_ollama(article_content, type, system_prompt_function_generator_list_search, system_prompt_function_generator_id_search)
         return generate_code_from_content_gemini(article_content, type, system_prompt_function_generator_list_search, system_prompt_function_generator_id_search)
     except Exception as e:
         print(f"Error generating summary: {e}")
@@ -1616,4 +1702,6 @@ def generate_prompt_from_content(article_content: str, prompt_type: str, include
         )
     if llm_client == "claude":
         return generate_prompt_from_content_claude(article_content, prompt_type, system_prompts, include_rationale)
+    if llm_client == "ollama":
+        return generate_prompt_from_content_ollama(article_content, prompt_type, system_prompts, include_rationale)
     return generate_prompt_from_content_gemini(article_content, prompt_type, system_prompts, include_rationale)

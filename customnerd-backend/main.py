@@ -134,6 +134,21 @@ def check_missing_api_keys():
             }
         elif 'ANTHROPIC_API_KEY' in all_warnings:
             del all_warnings['ANTHROPIC_API_KEY']
+    elif llm_preference.lower() == 'ollama':
+        # Ollama runs locally — no API key required. Optionally warn if base URL looks unreachable.
+        for key in ('OPENAI_API_KEY', 'GEMINI_API_KEY', 'ANTHROPIC_API_KEY'):
+            if key in all_warnings and all_warnings[key].get('type') == 'missing_api_key':
+                del all_warnings[key]
+        ollama_base_url = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434').strip('"').strip()
+        if not ollama_base_url:
+            all_warnings['OLLAMA_BASE_URL'] = {
+                "type": "missing_api_key",
+                "description": "Ollama Base URL",
+                "message": "OLLAMA_BASE_URL is not set; defaulting to http://localhost:11434",
+                "solution": "Add OLLAMA_BASE_URL=http://localhost:11434 to variables.env, or leave unset for default"
+            }
+        elif 'OLLAMA_BASE_URL' in all_warnings:
+            del all_warnings['OLLAMA_BASE_URL']
     else:
         openai_key = os.getenv('OPENAI_API_KEY', '').strip('"').strip()
         if not openai_key or openai_key == '':
@@ -863,8 +878,8 @@ async def update_env_config(config: dict):
             from dotenv import load_dotenv
             load_dotenv('variables.env', override=True)
             
-            # Reinitialize both OpenAI and Gemini clients
-            from helper_functions import reinitialize_openai_client
+            # Reinitialize OpenAI client
+            from openai_executions import reinitialize_openai_client
             reinitialize_openai_client()
             
             # Also reinitialize Gemini client if available
@@ -879,6 +894,12 @@ async def update_env_config(config: dict):
                 reinitialize_claude_client()
             except ImportError:
                 print("Claude client not available for reinitialization")
+            # Reinitialize Ollama client if available
+            try:
+                from ollama_executions import reinitialize_ollama_client
+                reinitialize_ollama_client()
+            except ImportError:
+                print("Ollama client not available for reinitialization")
             
             # Re-check for missing API keys after update
             check_missing_api_keys()
@@ -1590,6 +1611,420 @@ async def similar_questions(query: str, threshold: float = 0.2, limit: int = 3):
     except Exception as e:
         logging.error(f"Error computing similar questions: {str(e)}")
         raise HTTPException(status_code=500, detail="Could not compute similar questions")
+
+@app.get("/ollama_status")
+async def ollama_status():
+    """Check whether Ollama is installed and its server is reachable."""
+    import shutil
+    import platform as _platform
+    import urllib.request as _urlreq
+
+    is_installed = shutil.which('ollama') is not None
+    is_running = False
+    installed_models: list = []
+    system = _platform.system()
+
+    if is_installed:
+        try:
+            req = _urlreq.Request('http://localhost:11434/api/tags')
+            with _urlreq.urlopen(req, timeout=3) as resp:
+                if resp.status == 200:
+                    is_running = True
+                    data = json.loads(resp.read())
+                    installed_models = [m['name'] for m in data.get('models', [])]
+        except Exception:
+            pass
+
+    return {
+        "is_installed": is_installed,
+        "is_running": is_running,
+        "installed_models": installed_models,
+        "platform": system,
+    }
+
+
+async def _ollama_setup_generator(model: str):
+    """
+    Async generator that streams Ollama setup progress as SSE-compatible dicts.
+    Steps: 1) check/install  2) start server  3) pull model  4) verify
+    """
+    import shutil
+    import platform as _platform
+    import asyncio
+    import subprocess
+    import urllib.request as _urlreq
+
+    def _msg(message: str, step: int = 0, total: int = 4, msg_type: str = "progress"):
+        payload = {"type": msg_type, "step": step, "total": total, "message": message}
+        return {"event": "message", "data": json.dumps(payload)}
+
+    # ── Step 1: check / install ──────────────────────────────────────────────
+    yield _msg("Checking if Ollama is installed…", step=1)
+    await asyncio.sleep(0.05)
+
+    is_installed = shutil.which('ollama') is not None
+    system = _platform.system()
+
+    if is_installed:
+        yield _msg("Ollama is already installed.", step=1, msg_type="success")
+    else:
+        yield _msg(f"Ollama not found on {system}. Starting installation…", step=1)
+
+        # ── Windows ────────────────────────────────────────────────────────
+        if system == 'Windows':
+            # Method 1: official PowerShell script
+            yield _msg("Method 1/2 — Running official install script via PowerShell…", step=1)
+            ps_cmd = 'powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://ollama.com/install.ps1 | iex"'
+            rc = None
+            proc = await asyncio.create_subprocess_shell(
+                ps_cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            async for raw in proc.stdout:
+                line = raw.decode(errors='replace').strip()
+                if line:
+                    yield _msg(line, step=1, msg_type="install_log")
+            await proc.wait()
+            rc = proc.returncode
+            is_installed = shutil.which('ollama') is not None
+
+            if not is_installed:
+                # Method 2: winget
+                yield _msg("Method 1 did not succeed. Trying Method 2/2 — winget install Ollama.Ollama…", step=1)
+                winget = shutil.which('winget')
+                if winget:
+                    proc = await asyncio.create_subprocess_exec(
+                        'winget', 'install', '--id', 'Ollama.Ollama', '--accept-source-agreements', '--accept-package-agreements',
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.STDOUT,
+                    )
+                    async for raw in proc.stdout:
+                        line = raw.decode(errors='replace').strip()
+                        if line:
+                            yield _msg(line, step=1, msg_type="install_log")
+                    await proc.wait()
+                    is_installed = shutil.which('ollama') is not None
+                else:
+                    yield _msg("winget not found — skipping Method 2.", step=1, msg_type="warning")
+
+            if not is_installed:
+                yield _msg(
+                    "Automatic installation failed on Windows. "
+                    "Please download the installer manually from https://ollama.com and re-run setup.",
+                    step=1, msg_type="fatal"
+                )
+                return
+
+        # ── macOS ──────────────────────────────────────────────────────────
+        elif system == 'Darwin':
+            # Method 1: official curl script
+            yield _msg("Method 1/3 — Running official install script: curl -fsSL https://ollama.com/install.sh | sh", step=1)
+            proc = await asyncio.create_subprocess_shell(
+                'curl -fsSL https://ollama.com/install.sh | sh',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            async for raw in proc.stdout:
+                line = raw.decode(errors='replace').strip()
+                if line:
+                    yield _msg(line, step=1, msg_type="install_log")
+            await proc.wait()
+            is_installed = shutil.which('ollama') is not None
+            if is_installed:
+                yield _msg("Ollama installed via official script.", step=1, msg_type="success")
+
+            # Method 2: Homebrew
+            if not is_installed:
+                brew = shutil.which('brew')
+                if brew:
+                    yield _msg("Method 2/3 — Installing via Homebrew: brew install ollama…", step=1)
+                    proc = await asyncio.create_subprocess_exec(
+                        'brew', 'install', 'ollama',
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.STDOUT,
+                    )
+                    async for raw in proc.stdout:
+                        line = raw.decode(errors='replace').strip()
+                        if line:
+                            yield _msg(line, step=1, msg_type="install_log")
+                    await proc.wait()
+                    is_installed = shutil.which('ollama') is not None
+                    if is_installed:
+                        yield _msg("Ollama installed via Homebrew.", step=1, msg_type="success")
+                else:
+                    yield _msg("Homebrew not found — skipping Method 2.", step=1, msg_type="warning")
+
+            # Method 3: direct binary download
+            if not is_installed:
+                yield _msg("Method 3/3 — Downloading macOS binary directly from GitHub releases…", step=1)
+                arch = _platform.machine()
+                asset = 'ollama-darwin' if 'arm' not in arch.lower() and 'aarch' not in arch.lower() else 'ollama-darwin'
+                dl_cmd = (
+                    f'curl -fsSL "https://github.com/ollama/ollama/releases/latest/download/{asset}" '
+                    f'-o /usr/local/bin/ollama && chmod +x /usr/local/bin/ollama'
+                )
+                proc = await asyncio.create_subprocess_shell(
+                    dl_cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.STDOUT,
+                )
+                async for raw in proc.stdout:
+                    line = raw.decode(errors='replace').strip()
+                    if line:
+                        yield _msg(line, step=1, msg_type="install_log")
+                await proc.wait()
+                is_installed = shutil.which('ollama') is not None
+                if is_installed:
+                    yield _msg("Ollama installed via direct binary download.", step=1, msg_type="success")
+
+            if not is_installed:
+                yield _msg(
+                    "All 3 installation methods failed on macOS. "
+                    "Please install manually: brew install ollama  or visit https://ollama.com",
+                    step=1, msg_type="fatal"
+                )
+                return
+
+        # ── Linux ──────────────────────────────────────────────────────────
+        else:
+            # Method 1: official curl script
+            yield _msg("Method 1/2 — Running official install script: curl -fsSL https://ollama.com/install.sh | sh", step=1)
+            proc = await asyncio.create_subprocess_shell(
+                'curl -fsSL https://ollama.com/install.sh | sh',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            async for raw in proc.stdout:
+                line = raw.decode(errors='replace').strip()
+                if line:
+                    yield _msg(line, step=1, msg_type="install_log")
+            await proc.wait()
+            is_installed = shutil.which('ollama') is not None
+            if is_installed:
+                yield _msg("Ollama installed via official script.", step=1, msg_type="success")
+                # Try to enable and start the systemd service silently
+                try:
+                    await asyncio.create_subprocess_shell(
+                        'sudo systemctl enable ollama && sudo systemctl start ollama',
+                        stdout=asyncio.subprocess.DEVNULL,
+                        stderr=asyncio.subprocess.DEVNULL,
+                    )
+                    yield _msg("systemd service enabled and started.", step=1, msg_type="install_log")
+                except Exception:
+                    pass
+
+            # Method 2: direct binary to ~/.local/bin
+            if not is_installed:
+                yield _msg("Method 2/2 — Downloading Linux binary to ~/.local/bin…", step=1)
+                arch = _platform.machine().lower()
+                if 'aarch64' in arch or 'arm64' in arch:
+                    asset = 'ollama-linux-arm64'
+                else:
+                    asset = 'ollama-linux-amd64'
+                dl_cmd = (
+                    'mkdir -p ~/.local/bin && '
+                    f'curl -fsSL "https://github.com/ollama/ollama/releases/latest/download/{asset}" '
+                    f'-o ~/.local/bin/ollama && chmod +x ~/.local/bin/ollama && '
+                    'export PATH="$HOME/.local/bin:$PATH"'
+                )
+                proc = await asyncio.create_subprocess_shell(
+                    dl_cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.STDOUT,
+                )
+                async for raw in proc.stdout:
+                    line = raw.decode(errors='replace').strip()
+                    if line:
+                        yield _msg(line, step=1, msg_type="install_log")
+                await proc.wait()
+                # Also check ~/.local/bin/ollama directly in case it's not on PATH yet
+                import os as _os
+                local_bin = _os.path.expanduser('~/.local/bin/ollama')
+                is_installed = shutil.which('ollama') is not None or _os.path.isfile(local_bin)
+                if is_installed:
+                    yield _msg("Ollama binary installed to ~/.local/bin.", step=1, msg_type="success")
+
+            if not is_installed:
+                yield _msg(
+                    "All installation methods failed on Linux. "
+                    "Please install manually: curl -fsSL https://ollama.com/install.sh | sh",
+                    step=1, msg_type="fatal"
+                )
+                return
+
+        yield _msg("Ollama installed successfully.", step=1, msg_type="success")
+
+    # ── Step 2: ensure server is running ────────────────────────────────────
+    yield _msg("Checking Ollama server status…", step=2)
+    await asyncio.sleep(0.05)
+
+    def _server_running() -> bool:
+        try:
+            with _urlreq.urlopen('http://localhost:11434/api/tags', timeout=3) as r:
+                return r.status == 200
+        except Exception:
+            return False
+
+    if _server_running():
+        yield _msg("Ollama server is already running.", step=2, msg_type="success")
+    else:
+        yield _msg("Starting Ollama server (ollama serve)…", step=2)
+        subprocess.Popen(
+            ['ollama', 'serve'],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        started = False
+        for _ in range(15):
+            await asyncio.sleep(1)
+            if _server_running():
+                started = True
+                break
+        if started:
+            yield _msg("Ollama server started.", step=2, msg_type="success")
+        else:
+            yield _msg(
+                "Server may still be starting — continuing with model pull. "
+                "If issues persist, run 'ollama serve' in a terminal.",
+                step=2, msg_type="warning"
+            )
+
+    # ── Step 3: pull model ───────────────────────────────────────────────────
+    yield _msg(f"Pulling model '{model}' — this can take several minutes for large models…", step=3)
+    await asyncio.sleep(0.05)
+
+    pull_proc = await asyncio.create_subprocess_exec(
+        'ollama', 'pull', model,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+    )
+    async for raw in pull_proc.stdout:
+        line = raw.decode(errors='replace').strip()
+        if line:
+            yield _msg(line, step=3, msg_type="pull_log")
+    await pull_proc.wait()
+
+    if pull_proc.returncode == 0:
+        yield _msg(f"Model '{model}' pulled successfully.", step=3, msg_type="success")
+    else:
+        yield _msg(
+            f"Pull failed for '{model}'. Check the model name and your internet connection.",
+            step=3, msg_type="error"
+        )
+        return
+
+    # ── Step 4: verify ───────────────────────────────────────────────────────
+    yield _msg("Verifying setup…", step=4)
+    await asyncio.sleep(0.5)
+
+    try:
+        with _urlreq.urlopen('http://localhost:11434/api/tags', timeout=5) as r:
+            data = json.loads(r.read())
+            names = [m['name'] for m in data.get('models', [])]
+            base = model.split(':')[0]
+            found = any(base in n for n in names)
+        msg = (
+            f"✓ Setup complete! Ollama is running and model '{model}' is ready."
+            if found else
+            f"✓ Setup complete! Model '{model}' should be available — restart the backend if needed."
+        )
+        yield _msg(msg, step=4, msg_type="complete")
+    except Exception:
+        yield _msg(
+            f"✓ Setup steps finished. If the model is not responding, run 'ollama serve' and 'ollama pull {model}' manually.",
+            step=4, msg_type="complete"
+        )
+
+
+@app.get("/ollama_setup")
+async def ollama_setup(model: str = Query(default='llama3.2')):
+    """
+    Stream Ollama setup progress via SSE.
+    Steps: install Ollama → start server → pull model → verify.
+    """
+    return EventSourceResponse(_ollama_setup_generator(model))
+
+
+class ApiKeyTestRequest(BaseModel):
+    api_key: str = ""
+
+
+@app.post("/test_api_key/{provider}")
+async def test_api_key(provider: str, body: ApiKeyTestRequest):
+    """
+    Test whether an API key / connection works for a given provider.
+    Accepts: openai | gemini | claude | ollama
+    Returns: {"ok": bool, "message": str}
+    """
+    key = body.api_key.strip()
+
+    if provider == "openai":
+        if not key:
+            return {"ok": False, "message": "No API key entered."}
+        try:
+            from openai import OpenAI as _OpenAI, AuthenticationError as _OAIAuthError
+            tc = _OpenAI(api_key=key, timeout=10)
+            tc.models.list()
+            return {"ok": True, "message": "OpenAI key is valid — connection successful ✓"}
+        except _OAIAuthError:
+            return {"ok": False, "message": "Invalid API key — authentication failed."}
+        except Exception as e:
+            msg = str(e)
+            if "401" in msg or "invalid" in msg.lower():
+                return {"ok": False, "message": "Invalid API key — authentication failed."}
+            return {"ok": False, "message": f"Connection error: {msg[:150]}"}
+
+    elif provider == "gemini":
+        if not key:
+            return {"ok": False, "message": "No API key entered."}
+        try:
+            from google import genai as _genai
+            tc = _genai.Client(api_key=key)
+            list(tc.models.list())
+            return {"ok": True, "message": "Gemini key is valid — connection successful ✓"}
+        except Exception as e:
+            msg = str(e)
+            if any(x in msg for x in ["401", "403", "API_KEY_INVALID", "invalid"]):
+                return {"ok": False, "message": "Invalid API key — authentication failed."}
+            return {"ok": False, "message": f"Connection error: {msg[:150]}"}
+
+    elif provider == "claude":
+        if not key:
+            return {"ok": False, "message": "No API key entered."}
+        try:
+            from anthropic import Anthropic as _Anthropic, AuthenticationError as _AnthAuthError
+            tc = _Anthropic(api_key=key, timeout=10)
+            tc.models.list()
+            return {"ok": True, "message": "Claude key is valid — connection successful ✓"}
+        except _AnthAuthError:
+            return {"ok": False, "message": "Invalid API key — authentication failed."}
+        except Exception as e:
+            msg = str(e)
+            if any(x in msg.lower() for x in ["401", "403", "invalid", "authentication"]):
+                return {"ok": False, "message": "Invalid API key — authentication failed."}
+            return {"ok": False, "message": f"Connection error: {msg[:150]}"}
+
+    elif provider == "ollama":
+        try:
+            import urllib.request as _urlreq
+            base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+            with _urlreq.urlopen(f"{base_url}/api/tags", timeout=5) as r:
+                data = json.loads(r.read())
+                models = [m["name"] for m in data.get("models", [])]
+            if models:
+                preview = ", ".join(models[:4]) + ("…" if len(models) > 4 else "")
+                return {"ok": True, "message": f"Ollama is running ✓ — {len(models)} model(s): {preview}"}
+            return {"ok": True, "message": "Ollama is running ✓ — no models pulled yet (run setup to pull one)"}
+        except Exception:
+            return {
+                "ok": False,
+                "message": "Ollama server not reachable on port 11434 — click 'Update Environment Configuration' to install & start it."
+            }
+
+    return {"ok": False, "message": f"Unknown provider '{provider}'."}
+
 
 if __name__ == "__main__":
     import uvicorn

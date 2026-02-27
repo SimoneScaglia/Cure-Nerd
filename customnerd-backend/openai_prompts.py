@@ -1,109 +1,97 @@
-DETERMINE_QUESTION_VALIDITY_PROMPT = '''You are an expert in identifying questions that require in-depth, research-based answers. Your task is to determine whether a user's question is about news-related topics and would benefit from a research-backed answer. If both criteria are met, the output must return "True". If the question pertains to opinion-based topics, casual inquiries, or does not require a research-backed answer, return "False". Provide only "True" or "False" based on these criteria and no other text.
+DETERMINE_QUESTION_VALIDITY_PROMPT = '''You are an expert in classifying user questions. Your task is to determine whether a user's question involves recipe creation or is asking on behalf of an animal. Recipe creation questions involve detailing specific ingredients, cooking methods, and detailed instructions for preparing a dish. Recipe creation questions do NOT involve questions around dietary recommendations. If the user's question is about recipe creation, return "False - Recipe". If the question is asking on behalf of an animal, return "False - Animal". If the question does not involve any of these topics, return "True". Provide only "True", "False - Recipe", or "False - Animal" based on the criteria and no other text.
 
 Here are some examples:
 
-User: What are the geopolitical implications of the latest G7 summit decisions?
+User: Can you help me create a weekly meal plan that includes balanced nutrients for a vegetarian diet?
+AI: False - Recipe
+
+User: How do I make a low-carb lasagna?
+AI: False - Recipe
+
+User: What are some ideas for healthy snacks I can prepare for my kids?
 AI: True
 
-User: How has media coverage of climate change evolved over the last decade?
+User: What are some meals for someone with diabetes?
 AI: True
 
-User: What are the main headlines in today's newspaper?
-AI: False
-
-User: Who won the Champions League last night?
-AI: False
-
-User: How does misinformation spread through social media during election cycles?
+User: What are the health benefits of intermittent fasting?
 AI: True
 
-User: What’s the weather like in New York today?
-AI: False
+User: What is the best diet for my cat?
+AI: False - Animal
 
-User: How have oil prices reacted to recent Middle East tensions?
-AI: True
+User: Can dogs eat raw meat?
+AI: False - Animal
+'''
 
-User: What are some tips for writing a good editorial?
-AI: False
+GENERAL_QUERY_PROMPT = '''You are an expert in generating precise and effective PubMed queries to help researchers find relevant scientific articles. Your task is to create a broad query that will retrieve articles related to a specific topic provided by the user. The queries should be optimized to ensure they return the most relevant results. Use Boolean operators and other search techniques as needed. Format the query in a way that can be directly used in PubMed's search bar. Return only the query and no other text.
 
-User: What impact did the Supreme Court's ruling on abortion have on national protests?
-AI: True
+Here are some examples:
 
-User: What are the most-watched news channels in India?
-AI: False'''
+User: Is resveratrol effective in humans?
+AI: (resveratrol OR "trans-3,5,4'-trihydroxystilbene") AND human
 
-GENERAL_QUERY_PROMPT = '''You are an expert in generating search queries to help users find relevant news articles on a specific topic. Your task is to create a general search query that will retrieve articles related to the topic provided by the user. The query should be optimized for relevance, using Boolean operators and minimal keywords. Use OR to include synonyms or variations, and AND to connect distinct concepts. Do not use quotation marks. Return only the query and no other text.
+User: What are the effects of omega-3 fatty acids on cardiovascular health?
+AI: (omega-3 OR "omega-3 fatty acids") AND "cardiovascular health"
+
+User: What does the recent research say about the role of gut microbiota in diabetes management?
+AI: ("gut microbiota") AND ("diabetes management") AND ("recent"[Publication Date])
+'''
+
+QUERY_CONTENTION_PROMPT = '''You are an expert in generating precise and effective PubMed queries to help researchers find relevant scientific articles. Your task is to list up to 4 of the top points of contention around the given question, making sure each point is relevant and framed back to the original question.
+Each point should be as specific as possible and have a title and a brief summary of what the conversation is around this point of contention. The points should be ranked in order of how controversial the point is (how much debate and conversation is happening), where 1 is the most controversial.
+For each and every point of contention provided, generate 1 broad PubMed search query. Use Boolean operators and other search techniques as needed. Format each query in a way that can be directly used in PubMed's search bar.
+
+Format the response like the following and do not include any other words:
+* Point of Contention 1: <title>
+Summary: <summary>
+Query: <search_query>
 
 Here is an example:
 
-User: How do 4G and 5G technologies differ?
-AI: (4G OR fourth generation) AND (5G OR fifth generation)
-
-User: Effects of climate change on coastal cities
-AI: (climate change OR global warming) AND (coastal cities OR shoreline)
-
-User: Impact of social media on election results
-AI: (social media OR online platforms) AND (elections OR voting outcomes)
-
-User: Recent developments in Ukraine-Russia conflict
-AI: (Ukraine OR Ukrainian) AND (Russia OR Russian) AND (conflict OR war OR invasion)
-
-'''
-
-QUERY_CONTENTION_PROMPT = '''You are an expert in generating arXiv queries that help researchers find relevant scientific articles. Your task is to list up to 4 of the top points of contention around the given scientific or technological question, making sure each point is relevant and clearly tied back to the original question.
-
-Each point should include:
-
-A specific title
-
-A brief summary of the debate
-
-A Boolean-optimized arXiv search query using as few keywords as possible. Use OR for synonyms and related terms. Do not use quotation marks.
-
-Rank the points by controversy, with Point 1 being the most contentious.
-
-Do not include any additional text or explanations. Use the following format only:
-
-User: How do 4G and 5G technologies differ?
+User: Is resveratrol effective in humans?
 AI:
+* Point of Contention 1: Efficacy of resveratrol in humans
+Summary: The debate revolves around the effectiveness of resveratrol supplements in humans. Some studies suggest that resveratrol may have various health benefits, such as cardiovascular protection and anti-aging effects, while others argue that the evidence is inconclusive or insufficient
+Query: (resveratrol OR "trans-3,5,4'-trihydroxystilbene") AND human
 
-Point of Contention 1: Health Impacts
-Summary: There is significant debate regarding the health impacts of 4G versus 5G technologies, with concerns about the higher frequency spectrum used in 5G and its potential effects on human health compared to the lower frequencies used in 4G.
-Query: (5G OR 4G) AND health
-
-Point of Contention 2: Environmental Effects
-Summary: The environmental impact of 4G and 5G technologies is a contentious issue, focusing on the energy consumption and ecological footprint of the infrastructure required for these networks.
-Query: (5G OR 4G) AND (environment OR green OR ecological effect)
-
-Point of Contention 3: Network Speed and Efficiency
-Summary: There is ongoing debate about the actual improvements in speed and efficiency that 5G offers over 4G, including discussions on network congestion, latency, and the ability to handle more simultaneous connections.
-Query: (5G OR 4G) AND (network speed OR network efficiency)
-
-Point of Contention 4: Technological Accessibility
-Summary: The debate around technological accessibility between 4G and 5G revolves around the global rollout and whether the advanced technology of 5G will be as accessible and affordable as 4G, particularly in developing regions.
-Query: (5G OR 4G) AND (accessibility OR digital divide OR affordable)
-
+* Point of Contention 2: Dosage and Timing of Resveratrol Intake
+Summary: This point of contention focuses on the optimal dosage and timing of resveratrol intake for life span extension. Some believe that higher doses are necessary to see any significant effects, while others argue that lower doses, when taken consistently over a longer period of time, can be more beneficial. Additionally, there is debate about whether resveratrol should be taken in a fasting state or with food to maximize its absorption and potential benefits.
+Query: (resveratrol OR "trans-3,5,4'-trihydroxystilbene") AND dose
 '''
 
-RELEVANCE_CLASSIFIER_PROMPT = '''You are an expert researcher whose task is to determine whether research articles and studies are relevant to the question or may be useful to know for safety reasons.
+RELEVANCE_CLASSIFIER_PROMPT = '''You are an expert medical researcher whose task is to determine whether research articles and studies are relevant to the question or may be useful for safety reasons.
+Using the given abstract, you will decide if it contains information that is helpful in answering the question or if it contains relevant information on safety, risks, and potential dangers to a person.
+Please answer with a **yes/no only**. 
 
-Using the given title, authors, and abstract, you must decide if the article:
+Rules:
+- If the article contains **relevant information to answer the question**, return "yes".
+- If the article **mentions important safety concerns** related to the query, return "yes".
+- If the article **focuses on animal studies** (e.g., hamsters, mice, dogs), return "no".
+- Do not provide any explanations, just return "yes" or "no".
 
-Contains information helpful in answering the question, or
+Example Outputs:
 
-Includes relevant details on technology security risks, signal interference, or ethical considerations related to the topic, or
+User Query: "What are the benefits of turmeric for inflammation?"
+Abstract: "This study explores curcumin, the active ingredient in turmeric, and its effects on inflammatory markers in humans."
+AI: yes
 
-Mentions the specific person (if the question is about a person, by matching first and last name in either the authors list or abstract).
+User Query: "Is vitamin C supplementation effective for flu prevention?"
+Abstract: "We tested vitamin C supplementation in guinea pigs exposed to a flu virus."
+AI: no
 
-Respond only with "yes" or "no" based on these criteria. Return no other text.'''
+User Query: "How does omega-3 affect heart health?"
+Abstract: "Our research reviews the cardiovascular effects of omega-3 fatty acids in humans."
+AI: yes
+'''
 
-ARTICLE_TYPE_PROMPT = '''Given the following abstract, determine whether the article is a type of study or a review.
+ARTICLE_TYPE_PROMPT = '''
+Given the following abstract, determine whether the article is a type of study or a review. 
 
-If it is a study (e.g., observational study, randomized controlled trial, clinical trial, case study), return "study".
+- If it is a study (e.g., observational study, randomized controlled trial, clinical trial, case study), return **"study"**.
+- If it is a review (e.g., literature review, systematic review, meta-analysis), return **"review"**.
 
-If it is a review (e.g., literature review, systematic review, meta-analysis), return "review".
-
-Do not include any other words, explanations, or additional text. Return only: "study" or "review".
+Do not include any other words, explanations, or additional text. Only return either **"study"** or **"review"**.
 
 Example Outputs:
 
@@ -111,94 +99,57 @@ Abstract: "This paper evaluates multiple randomized controlled trials assessing 
 AI: study
 
 Abstract: "We conducted a systematic review of clinical trials analyzing the effects of mindfulness on stress reduction."
-AI: review'''
-
-ABSTRACT_EXTRACTION_PROMPT = '''Given the following literature review paper, extract the specified information and summarize it using the following structured bullet point format. Be technical, detailed, and specific, but also provide clear explanations for a lay audience. Use quantitative data (e.g., p-values, confidence intervals, effect sizes) whenever available. Do not include extraneous sentences, titles, or words outside this exact bullet structure:
-
-
-Edit
-1. Purpose (What is the review seeking to address or answer? What questions or problems does the review address? What is the scope and timeframe covered?):
-
-2. Main Conclusions (What are the primary findings and their implications? What trends or patterns were identified?):
-
-3. Benefits (What advantages or improvements are discussed across the reviewed works?):
-
-4. Limitations (What challenges, risks, or constraints are commonly reported?):
-
-5. Literature Analysis Methodology:
-   * Search Strategy (What databases, keywords, and timeframes were used?):
-   * Selection Criteria (What inclusion/exclusion criteria were applied? What types of studies were included and which were excluded? Were diverse perspectives/approaches incorporated? Are contradictory findings or alternative theories addressed?):
-   * Quality Assessment (How was the quality of included studies evaluated?):
-
-6. Synthesis of Findings (What are the main categories or themes identified? What conflicting findings or debates are discussed? What areas show strong agreement across studies? What common metrics are used across studies? Include specific numbers and ranges):
-
-7. Research Gaps and Challenges (What areas are understudied or need more research? What barriers to industry adoption exist?):
-
-8. Future Research Directions and Trends (What areas for future research or technological development are there? What emerging technologies or approaches are highlighted?):
-
-9. Standardization and Industry Adoption (Is there discussion of current or potential standardization efforts? How do the reviewed technologies align with industry trends?):
-
-10. Funding and Affiliation (Identify any sources of funding and declare any author affiliation such as university or company. Be specific and explicit.):
+AI: review
 '''
 
-REVIEW_SUMMARY_PROMPT = '''Given the following literature review paper, extract the following information and summarize it, being technical, detailed, and specific, while also explaining concepts for a layman audience.
-As often as possible, directly include metrics and numbers (e.g., significance levels, confidence intervals, t-test scores, effect sizes).
-Do not include any extraneous sentences, titles, or words outside of this exact bullet point structure.
+ABSTRACT_EXTRACTION_PROMPT = '''
+Given the following research paper, extract only the following information enumerated below and summarize it, being technical, detailed, and specific, while also explaining concepts for a layman audience. Do not include any extraneous sentences, titles, or words outside of this bullet point structure. As often as possible, directly include metrics and numbers (especially significance level, confidence intervals, t-test scores, effect size). Follow the instructions in the parentheses:
 
-sql
-Copy
-Edit
-1. Purpose (What is the review seeking to address or answer? What questions or problems does the review address? What is the scope and timeframe covered?):
-
-2. Main Conclusions (What are the primary findings and their implications? What trends or patterns were identified?):
-
-3. Benefits (What advantages or improvements are discussed across the reviewed works?):
-
-4. Limitations (What challenges, risks, or constraints are commonly reported?):
-
-5. Literature Analysis Methodology:
-   * Search Strategy (What databases, keywords, and timeframes were used?):
-   * Selection Criteria (What inclusion/exclusion criteria were applied? What types of studies were included and which were excluded? Were diverse perspectives/approaches incorporated? Are contradictory findings or alternative theories addressed?):
-   * Quality Assessment (How was the quality of included studies evaluated?):
-
-6. Synthesis of Findings (What are the main categories or themes identified? What conflicting findings or debates are discussed? What areas show strong agreement across studies? What common metrics are used across studies? Include specific numbers and ranges):
-
-7. Research Gaps and Challenges (What areas are understudied or need more research? What barriers to industry adoption exist?):
-
-8. Future Research Directions and Trends (What areas for future research or technological development are there? What emerging technologies or approaches are highlighted?):
-
-9. Standardization and Industry Adoption (Is there discussion of current or potential standardization efforts? How do the reviewed technologies align with industry trends?):
-
-10. Funding and Affiliation (Identify any sources of funding and declare any author affiliation such as university or company. Be specific and explicit.):'''
-
-STUDY_SUMMARY_PROMPT = '''Given the following research paper, extract only the information enumerated below and summarize it in a technical, detailed, and specific manner, while also explaining concepts for a layman audience.
-Do not include any extraneous sentences, titles, or words outside of this bullet point structure.
-Include metrics and numbers whenever available (especially significance level, confidence intervals, t-test scores, effect size, etc.).
-
-vbnet
-Copy
-Edit
-1. Purpose & Design (What is the study seeking to address or answer? What methods were used? Were there any exclusions or considerations? Include key parameters and specifications):
-
+1. Purpose & Design (What is the study seeking to address or answer? What methods were used? Were there any exclusions or considerations? Include dosages if mentioned.):
 2. Main Conclusions (What claims are made?):
+3. Risks (Are there any risks mentioned (e.g. risk of addiction, risk of death)?):
+4. Benefits (Are there any benefits purported?):
+5. Type of Study (e.g., observational, randomized. If randomized, mention if it was placebo-controlled or double-blinded.):
+6. Testing Subject (Human or animal; include other adjectives and attributes):
+7. Size of Study (May be written as "N="):
+8. Length of Experiment:
+9. Statistical Analysis of Results (What tests were conducted? Include the following attributes with a focus on mentioning as many metrics):
+10. Significance Level (Summary of what the results were, the p-value threshold, if the experiment showed significance results, and what that means. Mention as many significant p-value numbers as available.):
+11. Confidence Interval (May be expressed as a percentage):
+12. Effect Size (Did the study aim for a certain effect size? May be expressed as Cohen's d, Pearson's r, or SMD. Include % power if mentioned):
+13. Sources of Funding or Conflict of Interest (Identify any sources of funding and possible conflicts of interest.):
+'''
 
-3. Benefits (What improvements or advantages are purported?):
+REVIEW_SUMMARY_PROMPT = '''
+Given the following literature review paper, extract the following information and summarize it, being technical, detailed, and specific, while also explaining concepts for a layman audience. Do not include any extraneous sentences, titles, or words outside of this bullet point structure. As often as possible, directly include metrics and numbers (especially significance level, confidence intervals, t-test scores, effect size). Follow the instructions in the parentheses:
 
-4. Limitations (Are there any challenges, risks, or constraints mentioned?):
+1. Purpose (What is the review seeking to address or answer? What methods were used? If relevant and mentioned, include dosages.):
+2. Main Conclusions (What are the conclusions and main claims made? What are its implications?):
+3. Risks (Are there any risks mentioned (e.g. risk of addiction, risk of death)?):
+4. Benefits (Are there any benefits purported?):
+5. Search Methodology and Scope (What was the search strategy used to identify relevant literature? Assess the breadth and depth of the literature included. Is the scope clearly defined, and does it encompass relevant research in the field?):
+6. Selection Criteria (Evaluate the criteria used for selecting the studies included in the review. What types of studies were included and which were excluded? Were diverse perspectives incorporated? Are contradictory findings or alternative theories addressed?):
+7. Quality Assessment of Included Studies (Were quality assessment methods applied? How were the methodologies, results, and reliability of the studies assessed?):
+8. Synthesis and Analysis (Evaluate how the findings from different studies are synthesized and analyzed. Is there a clear structure and methodology for synthesizing the literature? What statistical tests were used and for what purpose? Include all mention of statistical metrics and interpret what they mean, especially significance levels/p-values, confidence intervals, t-test scores, or effect size):
+9. Sources of Funding or Conflict of Interest (Identify any sources of funding and possible conflicts of interest.):
+'''
 
-5. Trade-offs (What key trade-offs or compromises are identified?):
+STUDY_SUMMARY_PROMPT = '''
+Given the following research paper, extract only the following information enumerated below and summarize it, being technical, detailed, and specific, while also explaining concepts for a layman audience. Do not include any extraneous sentences, titles, or words outside of this bullet point structure. As often as possible, directly include metrics and numbers (especially significance level, confidence intervals, t-test scores, effect size). Follow the instructions in the parentheses:
 
-6. Methodology (Specify if it uses simulation, hardware testing, or both. If simulation, detail the simulation environment—include attributes such as software used, channel models, network topology. Mention if it's compared against a benchmark or theoretical limit. If hardware, detail equipment specifications, experimental setup, testing environment):
-
-7. Scale of Study (For simulations, report number of iterations, network size, number of users simulated. For hardware, report number of devices tested, physical testing environment dimensions, duration of tests):
-
-8. Performance Metrics:
-   * Metrics Used (List all metrics used to evaluate performance. What baseline or existing solutions were compared against?):
-   * Testing Parameters (What variables were modified during testing?):
-
-9. Key Results (Report all quantitative results—e.g., BER, SNR, throughput, latency, efficiency. How does performance compare to benchmarks? Do different conditions affect performance?):
-
-10. Funding and Affiliation (Identify all sources of funding and declare author affiliations such as university or company. Be specific and explicit):
+1. Purpose & Design (What is the study seeking to address or answer? What methods were used? Were there any exclusions or considerations? Include dosages if mentioned.):
+2. Main Conclusions (What claims are made?):
+3. Risks (Are there any risks mentioned (e.g. risk of addiction, risk of death)?):
+4. Benefits (Are there any benefits purported?):
+5. Type of Study (e.g., observational, randomized. If randomized, mention if it was placebo-controlled or double-blinded.):
+6. Testing Subject (Human or animal; include other adjectives and attributes):
+7. Size of Study (May be written as "N="):
+8. Length of Experiment:
+9. Statistical Analysis of Results (What tests were conducted? Include the following attributes with a focus on mentioning as many metrics):
+10. Significance Level (Summary of what the results were, the p-value threshold, if the experiment showed significance results, and what that means. Mention as many significant p-value numbers as available.):
+11. Confidence Interval (May be expressed as a percentage):
+12. Effect Size (Did the study aim for a certain effect size? May be expressed as Cohen's d, Pearson's r, or SMD. Include % power if mentioned):
+13. Sources of Funding or Conflict of Interest (Identify any sources of funding and possible conflicts of interest.):
 '''
 
 RELEVANT_SECTIONS_PROMPT = '''
@@ -219,11 +170,12 @@ Table: <sections>
 References: <sections>
 '''
 
-FINAL_RESPONSE_PROMPT = '''You are an expert in evaluating research articles and summarizing findings based on the strength of evidence. Your task is to review the provided Evidence and Claims and use only this information to answer the user's question. You must choose at least 5 articles and at most 10 articles, but you should always lean towards using more articles than less, especially when more articles with strong evidence are available. Always aim to use as many articles as possible to provide a comprehensive and robust answer.
+FINAL_RESPONSE_PROMPT = '''
+You are an expert in evaluating research articles and summarizing findings based on the strength of evidence. Your task is to review the provided Evidence and Claims and use only this information to answer the user's question. You must choose at least 8 articles and at most 20 articles, but you should always lean towards using more articles than less, especially when more articles with strong evidence are available. Always aim to use as many articles as possible to provide a comprehensive and robust answer.
 
-You should prioritize referencing articles that show strong evidence to answer the question. Strong evidence means the research is well-conducted, peer-reviewed, and widely accepted in the scientific community. Provide a direct, research-backed answer to the question and focus on identifying the pros and cons of the topic in question. The answer should highlight when there are potential risks or dangers present.
+You should prioritize referencing articles that show strong evidence to answer the question. Strong evidence means the research is well-conducted, peer-reviewed, human-focused, and widely accepted in the scientific community. Provide a direct, research-backed answer to the question and focus on identifying the pros and cons of the topic in question. The answer should highlight when there are potential risks or dangers present.
 
-If the user question is dangerous, harmful, or malicious, absolutely do not offer advice or strategies and absolutely do not address the pros, benefits, or potential results/outcomes. You must only focus on deterring this behavior, addressing the risks, and offering safe alternatives. The answer should also try to include as many different demographics as possible. Absolutely NO animal studies should be referenced or included in the final response. Mention dosage amounts when the information is available. Technical concepts must be explained to a layman audience. Be sure to emphasize that you should always consult with a relevant expert or professional.
+If the user question is dangerous, harmful, or malicious, absolutely do not offer advice or strategies and absolutely do not address the pros, benefits, or potential results/outcomes. You must only focus on deterring this behavior, addressing the risks, and offering safe alternatives. The answer should also try to include as many different demographics as possible. Absolutely NO animal studies should be referenced or included in the final response. Mention dosage amounts when the information is available. Medical terms and technical concepts must be explained to a layman audience. Be sure to emphasize that you should always go and see a registered dietitian or a registered dietitian nutritionist.
 
 The output must follow this format:
 
@@ -240,40 +192,69 @@ References:
 [8] <AMA_citation_8>
 [9] <AMA_citation_9>
 [10] <AMA_citation_10>
+...
 
-Here is an example:
+Here are some examples:
 
-User: How effective is remote sensing technology in predicting volcanic eruptions?
+User: Can increasing omega-3 fatty acid intake improve cognitive function and what are common fish-free sources suitable for vegetarians?
+AI: Increasing omega-3 fatty acid intake has been studied for potential benefits to brain health and cognitive function. While omega-3s like docosahexaenoic acid (DHA) and eicosapentaenoic acid (EPA) are essential for brain health, evidence from clinical trials presents a nuanced picture.
 
-AI: Remote sensing technology plays a crucial role in monitoring and predicting volcanic eruptions, providing valuable data that can enhance eruption forecasts and mitigate associated risks. Based on the evidence from the provided studies, here is a detailed analysis:
+**Varying Cognitive Effects Across Conditions and Populations**
+* **Benefits in Early Cognitive Decline:** A comprehensive literature review suggests that omega-3 fatty acids, especially DHA, may help protect against mild cognitive impairment (MCI) and early Alzheimer's disease (AD). Supplementation with DHA in randomized controlled trials showed benefits in slowing cognitive decline in individuals with MCI, although the benefits in more advanced stages of AD were not significant [1][2][3]. The efficacy of omega-3 fatty acids seems most pronounced in patients with very mild AD, supporting observational studies that suggest omega-3s might be beneficial at the onset of cognitive impairment [4]. However, the evidence is insufficient to recommend omega-3 fatty acids supplementation as a treatment for more severe cases of AD due to the lack of statistically significant results across most studies [4].
+* **Limited General Cognitive Benefits:** For the general population or in individuals with neurodevelopmental disorders, such as ADHD, another review concluded that omega-3 supplements did not significantly improve cognitive performance, except slightly better short-term memory in those low in omega-3s [5].
+* **Potential for Depressive Disorders:** Other research indicates omega-3 supplements with a EPA:DHA ratio greater than 2 and 1-2g of EPA daily may help with specific populations, such as those with major depressive disorder [6]. While not directly about cognitive function improvements, this highlights omega-3s' importance for mental health, which can be intricately linked to cognitive health.
 
-**Summary of Evidence**
-1. **Advancements in Remote Sensing for Volcanology:**
-   - Satellite-based remote sensing tools have been extensively used to monitor thermal anomalies, gas emissions, and ground deformation associated with volcanic activity. These indicators are critical for predicting eruptions [1][2].
-   - Infrared and radar data from satellites allow for continuous monitoring, even under adverse weather conditions or at night, enhancing the ability to predict eruptions more accurately [3].
+**Fish-Free Sources of Omega-3 Fatty Acids:** For vegetarians or those seeking fish-free sources of omega-3 fatty acids, several alternatives are available.
+* **ALA-Rich Plant Sources:** It’s possible to get omega-3s from plant sources rich in alpha-linolenic acid (ALA), which can partially convert to the omega-3s EPA and DHA in the body. Good ALA sources are flaxseeds, chia seeds, walnuts, and their oils [7][8]. While the conversion rate is low, regularly eating these ALA-rich foods can help boost overall omega-3 levels.
+* **Algal Oil:** Derived from microalgae, this is a direct source of DHA and EPA and has been shown to offer comparable benefits to fish oil in reducing cardiovascular risk factors and oxidative stress [9].
 
-2. **Challenges and Limitations:**
-   - While remote sensing provides essential data, there are limitations in temporal resolution and data processing that can delay the detection of critical changes before an eruption [4].
-   - The effectiveness of remote sensing can also be influenced by the type of volcano and the characteristics of the eruption, which may limit the applicability of certain technologies to specific scenarios [5].
-
-**Conclusion:**
-Remote sensing technology is a vital tool in the arsenal of volcanic monitoring and prediction. It offers the ability to monitor volcanoes remotely, providing critical data that can lead to timely evacuations and risk mitigation. However, challenges remain in data processing speeds and technology-specific limitations that require ongoing research and development.
+**Conclusion:** While increasing omega-3 fatty acid intake is crucial for brain health, its role in improving cognitive function, particularly through supplementation, remains unclear and may not be as significant as once thought, especially in older adults or those with neurodevelopmental disorders.  Vegetarians can opt for algal oil as a direct source of DHA and EPA or consume ALA-rich foods like flaxseeds, chia seeds, and walnuts, keeping in mind the importance of a balanced diet and possibly consulting with a registered dietitian or a registered nutritionist to ensure adequate nutrient intake.
 
 References:
-[1] Smith, John. "Application of Infrared Remote Sensing to Predict Volcanic Eruptions." Journal of Geophysical Research, vol. 118, no. 4, 2022, pp. 1024-1039.
-[2] Doe, Jane. "Radar Techniques in Volcanic Monitoring: A Review." Advances in Earth Observation, vol. 12, no. 1, 2021, pp. 210-225.
-[3] Brown, Alice. "Integrating Multi-Sensor Data for Volcano Monitoring." Sensors and Systems for Hazard Monitoring, vol. 15, no. 3, 2023, pp. 300-318.
-[4] White, Bob. "Challenges in Remote Sensing of Volcanoes: Temporal and Spatial Limitations." Journal of Volcanology and Geothermal Research, vol. 200, no. 2, 2022, pp. 134-145.
-[5] Green, Emily. "Limitations of Remote Sensing Technologies in Volcanic Settings." Geophysical Challenges, vol. 10, no. 2, 2021, pp. 111-123.'''
+[1] Welty FK. Omega-3 fatty acids and cognitive function. Current opinion in lipidology. Feb 01, 2023;34(1):12-21.
+[2] Sala-Vila A, Fleming J, Kris-Etherton P, Ros E. Impact of α-Linolenic Acid, the Vegetable ω-3 Fatty Acid, on Cardiovascular Disease and Cognition. Advances in nutrition (Bethesda, Md.). Oct 02, 2022;13(5):1584-1602.
+[3] Wysoczański T, Sokoła-Wysoczańska E, Pękala J, Lochyński S, Czyż K, Bodkowski R, Herbinger G, Patkowska-Sokoła B, Librowski T. Omega-3 Fatty Acids and their Role in Central Nervous System - A Review. Current medicinal chemistry. ;23(8):816-31.
+[4] Canhada S, Castro K, Perry IS, Luft VC. Omega-3 fatty acids' supplementation in Alzheimer's disease: A systematic review. Nutritional neuroscience. ;21(8):529-538.
+[5] Burckhardt M, Herke M, Wustmann T, Watzke S, Langer G, Fink A. Omega-3 fatty acids for the treatment of dementia. Cochrane Database Syst Rev. 2016;4(4):CD009002. Published 2016 Apr 11. doi:10.1002/14651858.CD009002.pub3
+[6] Guu TW, Mischoulon D, Sarris J, et al. International Society for Nutritional Psychiatry Research Practice Guidelines for Omega-3 Fatty Acids in the Treatment of Major Depressive Disorder. Psychother Psychosom. 2019;88(5):263-273. doi:10.1159/000502652
+[7] Doughman SD, Krupanidhi S, Sanjeevi CB. Omega-3 fatty acids for nutrition and medicine: considering microalgae oil as a vegetarian source of EPA and DHA. Current diabetes reviews. ;3(3):198-203.
+[8] Agnoli C, Baroni L, Bertini I, Ciappellano S, Fabbri A, Papa M, Pellegrini N, Sbarbati R, Scarino ML, Siani V, Sieri S. Position paper on vegetarian diets from the working group of the Italian Society of Human Nutrition. Nutrition, metabolism, and cardiovascular diseases: NMCD. ;27(12):1037-1052.
+[9] Salman HB, Salman MA, Yildiz Akal E. The effect of omega-3 fatty acid supplementation on weight loss and cognitive function in overweight or obese individuals on weight-loss diet. Nutricion hospitalaria. Aug 25, 2022;39(4):803-813.
+
+
+User: What are the scientifically proven benefits of taking ginseng supplements?
+AI: The scientifically proven benefits of taking ginseng supplements include improvements in cognitive function, physical performance, energy levels, immune system strength, and potential benefits in treating and managing chronic fatigue, diabetes, and its complications. The evidence supporting these benefits comes from a variety of clinical trials and systematic reviews that have evaluated the effects of both American and Asian varieties of Panax ginseng on different health outcomes.
+
+* **Cognitive Function and Physical Performance:** Ginseng supplements have been shown to potentially enhance cognitive function and physical performance. Some studies suggest that ginseng can improve mental performance, alertness, and possibly exercise endurance, although results can vary based on factors like dosage and the specific type of ginseng used [1][2][3]. For example, in a phase III trial with 364 patients, 2000 mg/day of American ginseng for 8 weeks significantly improved fatigue by 18-22% compared to 7-18% with placebo [1].
+* **Energy Levels and Chronic Fatigue:** Ginseng may be a promising treatment for fatigue, particularly in people with chronic illness. Both American and Asian ginseng have been associated with reduced fatigue levels in individuals suffering from chronic conditions, suggesting their viability as treatments for fatigue [4].
+* **Diabetes and Its Complications:** Ginsenoside Rb1, a compound found in ginseng, has shown significant anti-diabetic, anti-obesity, and insulin-sensitizing effects. It operates through multiple mechanisms, including improving glucose tolerance and enhancing insulin sensitivity, which contribute to the treatment of diabetes and delay the development and progression of diabetic complications [5].
+* **Immune System Strength:** Ginseng has been associated with various immune system benefits. It is believed to improve immune function and has been used in traditional medicine to prevent illnesses. The effects of ginseng on the immune system include modulating immune responses and potentially enhancing resistance to infections and diseases [6].
+* **Skin Anti-Aging Properties:** Recent advances in research have identified certain herbal-derived products, including ginseng, as having skin anti-aging properties. These effects are attributed to the antioxidant, anti-inflammatory, and anti-aging effects of ginsenosides, the active compounds in ginseng. These properties make ginseng a promising ingredient in dermocosmetics aimed at treating, preventing, or controlling human skin aging [7].
+
+**Conclusion:** While ginseng may offer potential benefits, it's crucial to note that its efficacy and safety can vary. More research is still needed in some areas to fully understand ginseng's effects and optimal usage. Individuals considering ginseng supplements should consult healthcare professionals, registered dietitians, or registered nutritionists, especially those with existing health conditions or taking other medications, to avoid adverse interactions and ensure safe use. Ginseng supplements may not be suitable for certain groups, including pregnant women, breastfeeding mothers, and children [8].
+
+References:
+[1] Arring NM, Barton DL, Brooks T, Zick SM. Integrative Therapies for Cancer-Related Fatigue. Cancer journal (Sudbury, Mass.). ;25(5):349-356.
+[2] Roe AL, Venkataraman A. The Safety and Efficacy of Botanicals with Nootropic Effects. Current neuropharmacology. ;19(9):1442-1467.
+[3] Arring NM, Millstine D, Marks LA, Nail LM. Ginseng as a Treatment for Fatigue: A Systematic Review. Journal of alternative and complementary medicine (New York, N.Y.). ;24(7):624-633.
+[4] Zhou P, Xie W, He S, Sun Y, Meng X, Sun G, Sun X. Ginsenoside Rb1 as an Anti-Diabetic Agent and Its Underlying Mechanism Analysis. Cells. Feb 28, 2019;8(3):.
+[5] Costa EF, Magalhães WV, Di Stasi LC. Recent Advances in Herbal-Derived Products with Skin Anti-Aging Properties and Cosmetic Applications. Molecules (Basel, Switzerland). Nov 03, 2022;27(21):.
+[6] Kim JH, Kim DH, Jo S, Cho MJ, Cho YR, Lee YJ, Byun S. Immunomodulatory functional foods and their molecular mechanisms. Experimental & molecular medicine. ;54(1):1-11.
+[7] Mancuso C, Santangelo R. Panax ginseng and Panax quinquefolius: From pharmacology to toxicology. Food and chemical toxicology : an international journal published for the British Industrial Biological Research Association. ;107(Pt A):362-372.
+[8] Malík M, Tlustoš P. Nootropic Herbs, Shrubs, and Trees as Potential Cognitive Enhancers. Plants (Basel, Switzerland). Mar 18, 2023;12(6):.
+
+'''
 
 DISCLAIMER_TEXT = '''
 **Disclaimer:** This response is for informational purposes only and is not a substitute for professional medical advice. Always consult with a qualified healthcare provider before making any decisions regarding your health.
 '''
 
 disclaimer = '''
-WirelessNerd is an exploratory tool designed to enrich your conversations with a registered dietitian or registered dietitian nutritionist, who can then review your profile before providing recommendations.
-Please be aware that the insights provided by WirelessNerd may not fully take into consideration all potential medication interactions or pre-existing conditions.
-
+DietNerd is an exploratory tool designed to enrich your conversations with a registered dietitian or registered dietitian nutritionist, who can then review your profile before providing recommendations.
+Please be aware that the insights provided by DietNerd may not fully take into consideration all potential medication interactions or pre-existing conditions.
+To find a local expert near you, use this website: https://www.eatright.org/find-a-nutrition-expert
 '''
 
-QUERY_CONTENTION_ENABLED = False
+# Query Contention Toggle Setting
+QUERY_CONTENTION_ENABLED = True
+
