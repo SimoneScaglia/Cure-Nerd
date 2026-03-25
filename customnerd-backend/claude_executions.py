@@ -3,6 +3,8 @@ import time
 import logging
 import json
 import re
+import threading
+import collections
 from typing import Any, Dict, Optional
 
 from anthropic import (
@@ -26,6 +28,40 @@ DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 MAX_RETRIES = 3
 BACKOFF_SECS = 2
 DEFAULT_MAX_TOKENS = 8192
+
+# ---------------------------------------------------------------------------
+# Token-rate limiter — sliding window, thread-safe
+# ---------------------------------------------------------------------------
+_TPM_LIMIT = 50_000   # tokens per minute hard cap
+_TPM_WINDOW = 60.0    # seconds in the sliding window
+_tpm_lock = threading.Lock()
+_tpm_log: collections.deque = collections.deque()  # (timestamp, tokens) pairs
+
+
+def _tpm_acquire(tokens: int) -> None:
+    """
+    Block until `tokens` can be consumed without exceeding _TPM_LIMIT.
+    Sleeps automatically until capacity is available in the sliding window.
+    """
+    while True:
+        with _tpm_lock:
+            now = time.monotonic()
+            # Evict entries older than the sliding window
+            while _tpm_log and _tpm_log[0][0] <= now - _TPM_WINDOW:
+                _tpm_log.popleft()
+            used = sum(t for _, t in _tpm_log)
+            if used + tokens <= _TPM_LIMIT:
+                _tpm_log.append((now, tokens))
+                return
+            # Sleep until the oldest entry expires and frees up capacity
+            oldest_ts = _tpm_log[0][0]
+            sleep_for = max(0.05, (oldest_ts + _TPM_WINDOW) - now + 0.05)
+
+        logging.info(
+            f"[TPM] Window full ({used}/{_TPM_LIMIT} tokens used). "
+            f"Sleeping {sleep_for:.1f}s …"
+        )
+        time.sleep(sleep_for)
 
 
 def reinitialize_claude_client():
@@ -52,6 +88,7 @@ def _retryable_claude_call(
 ) -> str:
     """
     Wrapper that retries transient Anthropic errors.
+    Acquires token budget via the sliding-window TPM limiter before each attempt.
     Always returns the raw text string; never raises upwards.
     """
     if not client:
@@ -63,6 +100,10 @@ def _retryable_claude_call(
     messages = [{"role": "user", "content": user}]
     for attempt in range(MAX_RETRIES):
         try:
+            # Reserve tokens before making the call.
+            # max_tokens is a conservative upper-bound; actual usage is usually lower.
+            _tpm_acquire(max_tokens)
+
             response = client.messages.create(
                 model=DEFAULT_MODEL,
                 max_tokens=max_tokens,
