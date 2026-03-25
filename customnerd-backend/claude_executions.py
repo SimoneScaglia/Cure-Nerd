@@ -22,7 +22,7 @@ else:
     client = Anthropic(api_key=api_key)
 
 # Model: claude-sonnet-4-5 (balanced); alternatives: claude-haiku-4-5 (fast), claude-opus-4-5 (most capable)
-DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
+DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 MAX_RETRIES = 3
 BACKOFF_SECS = 2
 DEFAULT_MAX_TOKENS = 8192
