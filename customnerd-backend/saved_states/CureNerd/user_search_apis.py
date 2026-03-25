@@ -250,9 +250,9 @@ def collect_articles(query_list):
     if not queries:
         return []
 
-    max_results_per_source = int(os.getenv("CURENERD_MAX_RESULTS_PER_SOURCE", "20"))
-    mayo_pages = int(os.getenv("MAYO_SEARCH_PAGES", "5"))
-    max_total = int(os.getenv("ARTICLE_COUNTER", "100"))
+    max_results_per_source = int(os.getenv("CURENERD_MAX_RESULTS_PER_SOURCE", "5"))
+    mayo_pages = int(os.getenv("MAYO_SEARCH_PAGES", "2"))
+    max_total = int(os.getenv("ARTICLE_COUNTER", "15"))
 
     pubmed_articles = _collect_pubmed_articles(queries, max_results=max_results_per_source)
     arxiv_articles = _collect_arxiv_articles(queries, max_results=max_results_per_source)
