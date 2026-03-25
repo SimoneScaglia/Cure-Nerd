@@ -12,7 +12,7 @@ Return **"False - Animal"** if the question:
 - Involves veterinary topics of any kind
 Return **"False - Off Topic"** if the question:
 - Has no connection to human health, symptoms, or wellness
-- Falls into any category not covered above (technology, finance, relationships, etc.)
+- Falls into any category not covered above (technology, finance, relationships, weather, nobel prizes etc.)
 ## Edge Case Guidance
 - If a question mentions both a human symptom AND a recipe request, return "False - Off Topic"
 - If a question is ambiguous but plausibly health-related (e.g. "I feel off"), return "True"
@@ -46,8 +46,7 @@ GENERAL_QUERY_PROMPT = '''
 You are a biomedical search specialist for CureNerd. Your task is to generate optimized search queries across three different knowledge sources to find
 evidence supporting traditional and natural remedies for the symptom or ailment described by the user.
 For each user query, generate THREE separate search queries:
-1. PUBMED QUERY — target peer-reviewed clinical studies and trials.
-Use Boolean operators (AND, OR) and focus on natural compounds, herbal medicine, phytotherapy, and folk remedies. Include MeSH terms when applicable.
+1. PUBMED QUERY — target peer-reviewed clinical studies and trials. Use Boolean operators (AND, OR) and focus on natural compounds, herbal medicine, phytotherapy, and folk remedies. Include MeSH terms when applicable.
 2. ARXIV QUERY — target preprints and emerging research in biology and medicine (categories: q-bio, eess). Focus on recent findings about natural compounds.
 3. MAYO CLINIC QUERY — target patient-oriented clinical summaries. Use plain language terms that match how Mayo Clinic describes symptoms and treatments.
 Return only the three queries in this exact format and no other text:
