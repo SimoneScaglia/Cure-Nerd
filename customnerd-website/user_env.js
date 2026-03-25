@@ -1,12 +1,12 @@
 window.env = {
     "FRONTEND_FLOW": {
-        "SITE_NAME": "Diet Nerd",
+        "SITE_NAME": "Cure Nerd",
         "SITE_LOGO": "assets/customnerd_logo.png",
         "LOGO_NAME": "",
-        "SITE_ICON": "🥗",
-        "SITE_TAGLINE": "We answer your diet and nutrition questions based on the strongest scientific evidence",
+        "SITE_ICON": "⚕",
+        "SITE_TAGLINE": "We answer your cure and treatment questions using evidence from PubMed, arXiv, and Mayo Clinic",
         "DISCLAIMER": "Everything on this website is for educational purposes only. It is not intended to be a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of your physician or other qualified health provider with any questions you may have regarding a medical condition.",
-        "QUESTION_PLACEHOLDER": "Enter your diet-related question here....",
+        "QUESTION_PLACEHOLDER": "Enter your treatment-related question here....",
         "STYLES": {
             "BACKGROUND_COLOR": "#EFF8FF",
             "FONT_FAMILY": "'Roboto', sans-serif",
@@ -34,8 +34,8 @@ window.env = {
             },
             {
                 "id": "search-pubmed",
-                "label": "Search using Pubmed Articles",
-                "tooltip": "Automatically search PubMed for relevant articles",
+                "label": "Search using PubMed, arXiv, and Mayo Clinic",
+                "tooltip": "Automatically search PubMed, arXiv, and Mayo Clinic for relevant content",
                 "type": "checkbox",
                 "visible": true,
                 "defaultChecked": true

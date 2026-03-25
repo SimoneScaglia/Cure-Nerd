@@ -17,3 +17,11 @@ def fetch_articles_by_pmids(pmid_list):
             print(f"Error fetching article with PMID {pmid}: {e}")
             continue
     return articles
+
+
+def fetch_articles_by_ids(id_list):
+    """
+    Compatibility wrapper used by main.py.
+    In CureNerd IDs are expected to be PubMed PMIDs.
+    """
+    return fetch_articles_by_pmids(id_list)
